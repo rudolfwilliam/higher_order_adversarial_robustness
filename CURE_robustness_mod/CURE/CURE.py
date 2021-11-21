@@ -235,6 +235,22 @@ class CURELearner():
         }
         torch.save(state, path)
         
+    def save_state(self, path):
+        print('Saving...')
+
+        state = {
+            'net': self.net.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
+            'train_acc': self.train_acc,
+            'test_acc_clean': self.test_acc_clean,
+            'test_acc_adv': self.test_acc_adv,
+            'train_curv': self.train_curv,
+            'test_curv': self.test_curv,
+            'train_loss': self.train_loss,
+            'test_loss': self.test_loss
+        }
+        torch.save(state, path)
+
     def import_model(self, path):
         '''
         Importing the pre-trained model
@@ -242,7 +258,17 @@ class CURELearner():
         checkpoint = torch.load(path)
         self.net.load_state_dict(checkpoint['net'])
            
-            
+    def import_state(self, path):
+        checkpoint = torch.load(path)
+        self.net.load_state_dict(checkpoint['net'])
+        self.train_acc = checkpoint['train_acc']
+        self.test_acc_clean = checkpoint['test_acc_clean']
+        self.test_acc_adv = checkpoint['test_acc_adv']
+        self.train_curv = checkpoint['train_curv']
+        self.test_curv = checkpoint['test_curv']
+        self.train_loss = checkpoint['train_loss']
+        self.test_loss = checkpoint['test_loss']
+
     def plot_results(self):
         """
         Plotting the results
