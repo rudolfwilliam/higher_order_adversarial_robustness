@@ -8,6 +8,9 @@ pip install --user --upgrade --no-cache-dir virtualenv
 # Create a virtual environment
 virtualenv .venv --python=python3.7
 
+# Activate virtual environment
+source .venv/bin/activate
+
 # Install required libraries
 pip install -e .
 
