@@ -56,7 +56,8 @@ def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, e
        perturbed image
     """
     input_shape = inputs.shape
-    pert_image = inputs.clone().to(device)
+    pert_image = torch.tensor(inputs.detach().clone(),
+                              requires_grad=True).to(device)
     w = torch.zeros(input_shape)
     r_tot = torch.zeros(input_shape)
 
@@ -66,8 +67,9 @@ def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, e
     for ii in range(num_steps):
         pert_image.requires_grad_()
         # zero_gradients(pert_image)
-        pert_image.grad.detach_()
-        pert_image.grad.zero_()
+        if pert_image.grad is not None:
+            pert_image.grad.detach_()
+            pert_image.grad.zero_()
         fs = net.eval()(pert_image)
         loss_wrt_label = nn.CrossEntropyLoss()(fs, targets)
         grad = torch.autograd.grad(

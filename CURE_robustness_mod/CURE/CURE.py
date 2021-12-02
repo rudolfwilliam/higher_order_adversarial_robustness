@@ -1,7 +1,7 @@
 import torch
 import copy
 import torch.nn as nn
-#from torch.autograd.gradcheck import zero_gradients
+# from torch.autograd.gradcheck import zero_gradients
 from utils.utils import progress_bar
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,13 +16,14 @@ import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 from torch.optim.lr_scheduler import StepLR
 from torch.distributions import uniform
+from torchvision.transforms import ToTensor, Compose
 
 
 class CURELearner():
     def __init__(self, net, trainloader, testloader, lambda_=4, transformer=None, inverse_transformer=None, device='cuda',
                  path='./checkpoint'):
         '''
-        CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"     
+        CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
                     in https://arxiv.org/abs/1811.09716
         ================================================
         Arguments:
@@ -42,8 +43,17 @@ class CURELearner():
             raise ValueError("cuda is not available")
 
         self.net = net.to(device)
-        self.transformer = transformer
-        self.inverse_transformer = inverse_transformer
+        if transformer is not None and type(transformer.transforms[0]) == ToTensor:
+            self.transformer = Compose(transformer.transforms[1:])
+        else:
+            self.transformer = transformer
+
+        if inverse_transformer is not None and type(inverse_transformer.transforms[0]) == ToTensor:
+            self.inverse_transformer = Compose(
+                inverse_transformer.transforms[1:])
+        else:
+            self.inverse_transformer = inverse_transformer
+
         self.criterion = nn.CrossEntropyLoss()
         self.device = device
         self.lambda_ = lambda_
@@ -84,7 +94,7 @@ class CURELearner():
         Arguemnets:
 
         h : list with length less than the number of epochs
-            Different h for different epochs of training, 
+            Different h for different epochs of training,
             can have a single number or a list of floats for each epoch
         epochs : int
             Number of epochs
@@ -106,7 +116,7 @@ class CURELearner():
 
     def _train(self, epoch, h):
         '''
-        Training the model 
+        Training the model
         '''
         print('\nEpoch: %d' % epoch)
         train_loss, total = 0, 0
@@ -141,7 +151,7 @@ class CURELearner():
 
     def test(self, epoch, h, num_pgd_steps=20):
         '''
-        Testing the model 
+        Testing the model
         '''
         test_loss, adv_acc, total, curvature, clean_acc, grad_sum = 0, 0, 0, 0, 0, 0
 
@@ -190,7 +200,8 @@ class CURELearner():
         inputs.requires_grad_()
         outputs = self.net.eval()(inputs)
         loss_z = self.criterion(self.net.eval()(inputs), targets)
-        loss_z.backward(torch.ones(targets.size()).to(self.device))
+        # loss_z.backward(torch.ones(targets.size()).to(self.device))
+        loss_z.backward()
         grad = inputs.grad.data + 0.0
         norm_grad = grad.norm().item()
         z = torch.sign(grad).detach() + 0.
@@ -215,8 +226,10 @@ class CURELearner():
 
         loss_pos = self.criterion(outputs_pos, targets)
         loss_orig = self.criterion(outputs_orig, targets)
-        grad_diff = torch.autograd.grad((loss_pos-loss_orig), inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
-                                        create_graph=True)[0]
+        # grad_diff = torch.autograd.grad((loss_pos-loss_orig), inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
+        #                                create_graph=True)[0]
+        grad_diff = torch.autograd.grad(
+            (loss_pos-loss_orig), inputs, create_graph=True)[0]
         reg = grad_diff.reshape(grad_diff.size(0), -1).norm(dim=1)
         self.net.zero_grad()
 

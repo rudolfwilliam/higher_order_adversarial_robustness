@@ -28,7 +28,7 @@ get_transformer = get_mnist_transformer
 get_inverse_transformer = get_mnist_inverse_transformer
 
 # Constants
-device = "cpu"
+device = "cuda"
 
 batch_size_train = 64
 batch_size_test = 1000
