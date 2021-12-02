@@ -3,7 +3,11 @@
 
 # # Robustness via curvature regularization, and vice versa
 # This notebooks demonstrates how to use the CURE algorithm for training a robust network.
+import sys
+print(sys.version_info)
 
+import torch
+print(torch.__version__)
 
 import os
 if os.getcwd().endswith('notebooks'):
@@ -21,6 +25,9 @@ import torch
 
 # if model does not exist yet, it needs to be trained once
 train = False
+make_robust = True
+
+checkpoint_file = 'checkpoint/checkpoint_02.data'
 
 batch_size_train = 64
 batch_size_test = 1000
@@ -90,18 +97,19 @@ testloader = torch.utils.data.DataLoader(
               batch_size=batch_size_test, shuffle=True)
 
 
-net_CURE = CURELearner(network, trainloader, testloader, lambda_=1, device='cpu')
+net_CURE = CURELearner(network, trainloader, testloader, lambda_=1, device='cpu', path="./checkpoint/best_model.data")
 
 # **Set the optimizer**
 
 net_CURE.set_optimizer(optim_alg='SGD', args={'lr':1e-4})
 
 # **Train the model**
+if make_robust:
+    h = [0.1, 0.4, 0.8, 1.8, 3]
+    net_CURE.train(epochs=10, h=h)
 
-h = [0.1]
-net_CURE.train(epochs=1, h=h)
+    net_CURE.save_state(checkpoint_file)
+else:
+    net_CURE.import_state(checkpoint_file)
 
-net_CURE.save_state('../checkpoint/checkpoint_00.data')
-
-#net_CURE.plot_results()
-
+net_CURE.plot_results()

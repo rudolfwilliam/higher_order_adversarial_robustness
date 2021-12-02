@@ -38,7 +38,7 @@ def read_vision_dataset(path, batch_size=128, num_workers=4, dataset='CIFAR10', 
     
     return trainloader, testloader
 
-def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, epsil=5./255.*8):
+def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, epsil=5./255.*8, device="cpu"):
 
     """
        :param image: Image of size HxWx3
@@ -50,16 +50,16 @@ def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, e
        perturbed image
     """
     input_shape = inputs.shape
-    pert_image = inputs.clone().to('cuda:0')
+    pert_image = inputs.clone().to(device)
     w = torch.zeros(input_shape)
     r_tot = torch.zeros(input_shape)
     
-    denormal = transforms.Compose([transforms.Normalize((0., 0., 0.), (1/0.2023, 1/0.1994, 1/0.2010)),
-                             transforms.Normalize((-0.4914, -0.4822, -0.4465), (1., 1., 1.))])                                   
-    normal = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    denormal = transforms.Compose([transforms.Normalize((0.,), (1/0.3081,)),
+                             transforms.Normalize((-0.1307,), (1.,))])                                 
+    normal = transforms.Normalize((0.1307,), (0.3081,))
 
-    pert_image = pert_image + (torch.rand(inputs.shape).to('cuda:0')-0.5)*2*epsil
-    pert_image = pert_image.to('cuda:0')
+    pert_image = pert_image + (torch.rand(inputs.shape).to(device)-0.5)*2*epsil
+    pert_image = pert_image.to(device)
     
     for ii in range(num_steps):
         pert_image.requires_grad_()    
@@ -73,17 +73,13 @@ def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, e
         pert_image += dr * step_size
         for i in range(inputs.size(0)):
             pert_image[i] = torch.min(torch.max(pert_image[i], inputs[i] - epsil), inputs[i] + epsil)
-            pert_image[i] = pert_image[i] / torch.Tensor([1/0.2023, 1/0.1994, 1/0.2010]).view(3,1,1).cuda()
-            pert_image[i] -= torch.Tensor([-0.4914, -0.4822, -0.4465]).view(3,1,1).cuda()
+            pert_image[i] = denormal(pert_image[i])
             pert_image[i] = torch.clamp(pert_image[i], 0., 1.)
-            pert_image[i] = (pert_image[i] - torch.Tensor([0.4914, 0.4822, 0.4465]).view(3,1,1).cuda()) 
-            pert_image[i] /= torch.Tensor([0.2023, 0.1994, 0.2010]).view(3,1,1).cuda()
-                            
-            #pert_image[i] = normal(torch.clamp(pert_image[i], 0., 1.))[None, :, :, :]
-    
+            pert_image[i] = normal(pert_image[i])
+                                
     r_tot = pert_image - inputs
     regul = np.linalg.norm(r_tot.cpu().flatten(start_dim=1, end_dim=-1), np.inf, axis=1)
-    regul = torch.Tensor(regul).view(-1,1,1,1).cuda()
+    regul = torch.Tensor(regul).view(-1,1,1,1).to(device)
     r_tot = r_tot / regul
     
     return r_tot.cpu()
