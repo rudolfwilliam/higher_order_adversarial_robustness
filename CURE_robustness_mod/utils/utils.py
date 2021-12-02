@@ -3,16 +3,17 @@ import torchvision.datasets as datasets
 from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 import torch
-from torch.autograd.gradcheck import zero_gradients
+#from torch.autograd.gradcheck import zero_gradients
 import time
 import shutil
 import sys
 import numpy as np
 
+
 def read_vision_dataset(path, batch_size=128, num_workers=4, dataset='CIFAR10', transform=None):
     '''
     Read dataset available in torchvision
-    
+
     Arguments:
         dataset : string
             The name of dataset, it should be available in torchvision
@@ -25,21 +26,26 @@ def read_vision_dataset(path, batch_size=128, num_workers=4, dataset='CIFAR10', 
     Return: 
         trainloader, testloader
     '''
-    if not transform and dataset=='CIFAR10':
+    if not transform and dataset == 'CIFAR10':
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                 (0.2023, 0.1994, 0.2010)),
         ])
-        
-    trainset = getattr(datasets,dataset)(root=path, train=True, download=True, transform=transform)
-    trainloader = DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    testset = getattr(datasets,dataset)(root=path, train=False, download=True, transform=transform)
-    testloader = DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    
+
+    trainset = getattr(datasets, dataset)(
+        root=path, train=True, download=True, transform=transform)
+    trainloader = DataLoader(
+        trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    testset = getattr(datasets, dataset)(
+        root=path, train=False, download=True, transform=transform)
+    testloader = DataLoader(testset, batch_size=batch_size,
+                            shuffle=False, num_workers=num_workers)
+
     return trainloader, testloader
 
-def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, epsil=5./255.*8, device="cpu"):
 
+def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, epsil=5./255.*8, transformer=None, inverse_transformer=None, device="cpu"):
     """
        :param image: Image of size HxWx3
        :param net: network (input: images, output: values of activation **BEFORE** softmax).
@@ -53,35 +59,38 @@ def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, e
     pert_image = inputs.clone().to(device)
     w = torch.zeros(input_shape)
     r_tot = torch.zeros(input_shape)
-    
-    denormal = transforms.Compose([transforms.Normalize((0.,), (1/0.3081,)),
-                             transforms.Normalize((-0.1307,), (1.,))])                                 
-    normal = transforms.Normalize((0.1307,), (0.3081,))
 
     pert_image = pert_image + (torch.rand(inputs.shape).to(device)-0.5)*2*epsil
     pert_image = pert_image.to(device)
-    
+
     for ii in range(num_steps):
-        pert_image.requires_grad_()    
-        zero_gradients(pert_image)
+        pert_image.requires_grad_()
+        # zero_gradients(pert_image)
+        pert_image.grad.detach_()
+        pert_image.grad.zero_()
         fs = net.eval()(pert_image)
         loss_wrt_label = nn.CrossEntropyLoss()(fs, targets)
-        grad = torch.autograd.grad(loss_wrt_label, pert_image, only_inputs=True, create_graph=True, retain_graph=False)[0]
+        grad = torch.autograd.grad(
+            loss_wrt_label, pert_image, only_inputs=True, create_graph=True, retain_graph=False)[0]
 
         dr = torch.sign(grad.data)
         pert_image.detach_()
         pert_image += dr * step_size
         for i in range(inputs.size(0)):
-            pert_image[i] = torch.min(torch.max(pert_image[i], inputs[i] - epsil), inputs[i] + epsil)
-            pert_image[i] = denormal(pert_image[i])
+            pert_image[i] = torch.min(
+                torch.max(pert_image[i], inputs[i] - epsil), inputs[i] + epsil)
+            if inverse_transformer is not None:
+                pert_image[i] = inverse_transformer(pert_image[i])
             pert_image[i] = torch.clamp(pert_image[i], 0., 1.)
-            pert_image[i] = normal(pert_image[i])
-                                
+            if transformer is not None:
+                pert_image[i] = transformer(pert_image[i])
+
     r_tot = pert_image - inputs
-    regul = np.linalg.norm(r_tot.cpu().flatten(start_dim=1, end_dim=-1), np.inf, axis=1)
-    regul = torch.Tensor(regul).view(-1,1,1,1).to(device)
+    regul = np.linalg.norm(r_tot.cpu().flatten(
+        start_dim=1, end_dim=-1), np.inf, axis=1)
+    regul = torch.Tensor(regul).view(-1, 1, 1, 1).to(device)
     r_tot = r_tot / regul
-    
+
     return r_tot.cpu()
 
 
@@ -90,6 +99,7 @@ last_time = time.time()
 begin_time = last_time
 term_width, _ = shutil.get_terminal_size()
 term_width = int(term_width)
+
 
 def progress_bar(current, total, msg=None):
     global last_time, begin_time
@@ -133,6 +143,7 @@ def progress_bar(current, total, msg=None):
     else:
         sys.stdout.write('\n')
     sys.stdout.flush()
+
 
 def format_time(seconds):
     days = int(seconds / 3600/24)
