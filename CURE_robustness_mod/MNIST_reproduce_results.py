@@ -14,7 +14,7 @@ if os.getcwd().endswith('notebooks'):
     os.chdir('..')
 
 
-from CURE.CURE import CURELearner
+from CURE.CURE_mod import ModCURELearner
 from simple_MNIST_model import Net
 import matplotlib.pyplot as plt
 import torchvision
@@ -33,7 +33,7 @@ batch_size_train = 64
 batch_size_test = 1000
 
 if train:
-    n_epochs = 3
+    n_epochs = 1
     learning_rate = 0.01
     momentum = 0.5
     log_interval = 10
@@ -97,7 +97,7 @@ testloader = torch.utils.data.DataLoader(
               batch_size=batch_size_test, shuffle=True)
 
 
-net_CURE = CURELearner(network, trainloader, testloader, lambda_=1, device='cpu', path="./checkpoint/best_model.data")
+net_CURE = ModCURELearner(network, trainloader, testloader, lambda_=1, device='cpu', path="./checkpoint/best_model.data")
 
 # **Set the optimizer**
 
@@ -105,8 +105,8 @@ net_CURE.set_optimizer(optim_alg='SGD', args={'lr':1e-4})
 
 # **Train the model**
 if make_robust:
-    h = [0.1, 0.4, 0.8, 1.8, 3]
-    net_CURE.train(epochs=10, h=h)
+    h = [0.1]
+    net_CURE.train(epochs=1, h=h)
 
     net_CURE.save_state(checkpoint_file)
 else:
