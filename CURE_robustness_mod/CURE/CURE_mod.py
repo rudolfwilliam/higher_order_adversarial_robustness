@@ -223,8 +223,8 @@ class ModCURELearner():
         first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device), create_graph=True, retain_graph=True)[0].requires_grad_()
         scnd_order = self.elementwise_diff(first_order, inputs)
         third_order = self.elementwise_diff(scnd_order, inputs)
-        # take sum of absolute values of third order derivatives
-        reg_2 = torch.sum(torch.abs(third_order))
+        # take sum of squared values of third order derivatives
+        reg_2 = torch.sum(torch.pow(third_order, 2))
         self.net.zero_grad()
 
         return (torch.sum(self.lambda_ * (reg_1 + reg_2))) / float(inputs.size(0)), norm_grad
