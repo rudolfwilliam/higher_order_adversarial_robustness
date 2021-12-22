@@ -306,7 +306,7 @@ class CURELearner():
         plt.plot(self.train_curv, Linewidth=2, c='C0')
         plt.plot(self.test_curv, Linewidth=2, c='C1')
         plt.legend(['train_curv', 'test_curv'], fontsize=14)
-        plt.title('Curvetaure', fontsize=14)
+        plt.title('Curvataure', fontsize=14)
         plt.ylabel('curv', fontsize=14)
         plt.xlabel('epoch', fontsize=14)
         plt.grid()

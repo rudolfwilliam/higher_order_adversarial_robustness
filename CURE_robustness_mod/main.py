@@ -8,8 +8,6 @@ import torch.nn.functional as F
 import torchvision
 import matplotlib.pyplot as plt
 from CURE.CURE import CURELearner
-from data.mnist import get_mnist_dataloader, get_mnist_transformer, get_mnist_inverse_transformer
-from models.mnist_simple_model import get_simple_mnist_model
 
 # # Robustness via curvature regularization, and vice versa
 # This notebooks demonstrates how to use the CURE algorithm for training a robust network.
@@ -21,19 +19,22 @@ print(os.getcwd())
 ############################################################################################
 # BEGIN CONFIGURATION
 
-# Getter functions
-get_model = get_simple_mnist_model
-get_dataloader = get_mnist_dataloader
-get_transformer = get_mnist_transformer
-get_inverse_transformer = get_mnist_inverse_transformer
-
 # Constants
 device = "cuda"
 
-batch_size_train = 64
+batch_size_train = 100  #E: For some reasons the bugs want this to be 100 for cifar
 batch_size_test = 1000
 
 shuffle_train = True
+
+# Getter functions
+from getter import getter
+dataset = 'CIFAR10'
+model = 'ResNet18' # SimpleModel or ResNet18
+get_dataloader, get_transformer, get_inverse_transformer, get_model = getter(dataset, model)
+
+# Construct (and if needed train) model
+model = get_model()
 
 # CURE configurations
 lambda_ = 1
@@ -51,9 +52,6 @@ checkpoint_file = 'checkpoint_01.data'
 ############################################################################################
 
 checkpoint_path = Path("./data/checkpoints/")
-
-# Load the base model (train it if needed)
-model = get_model()
 
 # Load the dataset
 trainloader = get_dataloader(
