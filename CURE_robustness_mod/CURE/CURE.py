@@ -1,5 +1,6 @@
 import torch
 import copy
+import optuna
 import torch.nn as nn
 # from torch.autograd.gradcheck import zero_gradients
 from utils.utils import progress_bar
@@ -20,7 +21,7 @@ from torchvision.transforms import ToTensor, Compose
 
 
 class CURELearner():
-    def __init__(self, net, trainloader, testloader, lambda_=4, transformer=None, inverse_transformer=None, device='cuda',
+    def __init__(self, net, trainloader, testloader, lambda_=4, transformer=None, inverse_transformer=None, trial=None, device='cuda',
                  path='./checkpoint'):
         '''
         CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
@@ -55,6 +56,7 @@ class CURELearner():
             self.inverse_transformer = inverse_transformer
 
         self.criterion = nn.CrossEntropyLoss()
+        self.trial = trial
         self.device = device
         self.lambda_ = lambda_
         self.trainloader, self.testloader = trainloader, testloader
@@ -112,6 +114,15 @@ class CURELearner():
         for epoch, h_tmp in enumerate(h_all):
             self._train(epoch, h=h_tmp)
             self.test(epoch, h=h_tmp)
+
+            # This is used for hyperparameter tuning with optuna
+            if self.trial is not None:
+                current_acc_adv = self.test_acc_adv[-1]
+                self.trial.report(current_acc_adv, epoch)
+
+                if self.trial.should_prune():
+                    raise optuna.TrialPruned()
+
             self.scheduler.step()
 
     def _train(self, epoch, h):
@@ -149,7 +160,7 @@ class CURELearner():
         self.train_acc.append(100.*num_correct/total)
         self.train_curv.append(curvature/(batch_idx+1))
 
-    def test(self, epoch, h, num_pgd_steps=20):
+    def test(self, epoch, h, num_pgd_steps=20, eps=8/255, clip_min=0, clip_max=1):
         '''
         Testing the model
         '''
@@ -165,12 +176,16 @@ class CURELearner():
             clean_acc += predicted.eq(targets).sum().item()
             total += targets.size(0)
 
-            inputs_pert = inputs + 0.
-            eps = 5./255.*8
-            r = pgd(inputs, self.net.eval(), epsilon=[eps], targets=targets, step_size=0.04, num_steps=num_pgd_steps,
-                    epsil=eps, transformer=self.transformer, inverse_transformer=self.inverse_transformer, device=self.device)
+            # This was some really bad coding...
+            # inputs_pert = inputs + 0.
+            # eps = 5./255.*8
+            # inputs_pert = pgd(inputs, self.net.eval(), epsilon=[eps], targets=targets, step_size=0.04, num_steps=num_pgd_steps,
+            #                  epsil=eps, transformer=self.transformer, inverse_transformer=self.inverse_transformer, device=self.device)
+            # inputs_pert = inputs_pert + eps * torch.Tensor(r).to(self.device)
 
-            inputs_pert = inputs_pert + eps * torch.Tensor(r).to(self.device)
+            inputs_pert = pgd(inputs, self.net, epsilon=eps, targets=targets, step_size=0.04, num_steps=num_pgd_steps,
+                              normalizer=self.transformer, device=self.device, clip_min=clip_min, clip_max=clip_max)
+
             outputs = self.net(inputs_pert)
             probs, predicted = outputs.max(1)
             adv_acc += predicted.eq(targets).sum().item()

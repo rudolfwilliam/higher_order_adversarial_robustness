@@ -3,7 +3,7 @@ import torchvision.datasets as datasets
 from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 import torch
-#from torch.autograd.gradcheck import zero_gradients
+# from torch.autograd.gradcheck import zero_gradients
 import time
 import shutil
 import sys
@@ -23,7 +23,7 @@ def read_vision_dataset(path, batch_size=128, num_workers=4, dataset='CIFAR10', 
         transform_test : torchvision.transforms
             train image transformation
             if not given, the transformation for CIFAR10 is used
-    Return: 
+    Return:
         trainloader, testloader
     '''
     if not transform and dataset == 'CIFAR10':
@@ -45,7 +45,54 @@ def read_vision_dataset(path, batch_size=128, num_workers=4, dataset='CIFAR10', 
     return trainloader, testloader
 
 
-def pgd(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, epsil=5./255.*8, transformer=None, inverse_transformer=None, device="cpu"):
+def zero_gradients(tensor):
+    if tensor.grad is not None:
+        tensor.grad.detach_()
+        tensor.grad.zero_()
+
+
+def pgd(inputs, net, epsilon=8, targets=None, step_size=0.04, num_steps=20, normalizer=None, clip_min=0, clip_max=255, device="cpu"):
+    # We don't want to change the parameters of the NN
+    net.eval()
+
+    # If the images are normalized, normalize also 'epsilon' and the boundaries of the image domain
+    # ('clip_min' and 'clip_max')
+    if normalizer is not None:
+        epsilon = normalizer(torch.tensor(epsilon, dtype=torch.float32).view(1, 1, 1, 1)).to(device)
+        clip_min = normalizer(torch.tensor(clip_min, dtype=torch.float32).view(1, 1, 1, 1)).to(device)
+        clip_max = normalizer(torch.tensor(clip_max, dtype=torch.float32).view(1, 1, 1, 1)).to(device)
+
+    # The perturbed images
+    pert_images = inputs.detach().clone().to(device).requires_grad_(True)
+
+    # Randomize the starting point of PGD for each image
+    pert_images = pert_images + (torch.rand(inputs.shape, device=device) - 0.5) * 2 * epsilon
+    pert_images.clamp_(min=clip_min, max=clip_max)
+
+    # Perform the 'num_steps' projected gradient descent steps
+    for step in range(num_steps):
+        # Reset the gradient of the pertubed images
+        zero_gradients(pert_images)
+        pert_images.requires_grad_()
+
+        # Compute the predictions for the perturbed images
+        predictions = net(pert_images)
+
+        # Compute the gradient w.r.t the input
+        loss_wrt_label = nn.CrossEntropyLoss()(predictions, targets)
+        grad = torch.autograd.grad(
+            loss_wrt_label, pert_images, only_inputs=True, create_graph=False, retain_graph=False)[0]
+
+        # Update the perturbed images with small perturbations
+        pert_images = pert_images + epsilon * grad.sign()
+
+        # Project the images back into the image-domain
+        pert_images.clamp_(min=clip_min, max=clip_max)
+
+    return pert_images
+
+
+def pgd_old(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, epsil=5./255.*8, transformer=None, inverse_transformer=None, device="cpu"):
     """
        :param image: Image of size HxWx3
        :param net: network (input: images, output: values of activation **BEFORE** softmax).

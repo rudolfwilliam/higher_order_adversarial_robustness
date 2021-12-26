@@ -1,80 +1,54 @@
 #!/usr/bin/env python
 # coding: utf-8
-from pathlib import Path
-import torch
-import os
-import torch.optim as optim
-import torch.nn.functional as F
-import torchvision
-import matplotlib.pyplot as plt
-from CURE.CURE import CURELearner
 
-# # Robustness via curvature regularization, and vice versa
-# This notebooks demonstrates how to use the CURE algorithm for training a robust network.
-
-
-print(os.getcwd())
-
-
-############################################################################################
-# BEGIN CONFIGURATION
-
-# Constants
-device = "cuda"
-
-batch_size_train = 100  #E: For some reasons the bugs want this to be 100 for cifar
-batch_size_test = 1000
-
-shuffle_train = True
-
-# Getter functions
 from getter import getter
-dataset = 'CIFAR10'
-model = 'ResNet18' # SimpleModel or ResNet18
-get_dataloader, get_transformer, get_inverse_transformer, get_model = getter(dataset, model)
+from pathlib import Path
+from CURE.CURE import CURELearner
+from utils.config import CIFAR_CONFIG
 
-# Construct (and if needed train) model
-model = get_model()
 
-# CURE configurations
-lambda_ = 1
-h = [0.1, 0.4, 0.8, 1.8, 3]
-optimization_algorithm = 'SGD'
-optimizer_arguments = {
-    'lr': 1e-4
-}
-epochs = 10
+def train_CURE(config, plot_results=True, trial=None):
+    """
+    The main function.
+    """
 
-use_checkpoint = False
-checkpoint_file = 'checkpoint_01.data'
+    get_dataloader, get_transformer, get_inverse_transformer, get_model = getter(
+        config["dataset"], config["model_name"])
 
-# END CONFIGURATION
-############################################################################################
+    # Construct (and if needed train) model
+    model = get_model()
 
-checkpoint_path = Path("./data/checkpoints/")
+    checkpoint_path = Path("./data/checkpoints/")
 
-# Load the dataset
-trainloader = get_dataloader(
-    split="train", batch_size=batch_size_train, shuffle=shuffle_train)
-testloader = get_dataloader(split="test", batch_size=batch_size_test)
+    # Load the dataset
+    trainloader = get_dataloader(
+        split="train", batch_size=config["batch_size_train"], shuffle=config["shuffle_train"])
+    testloader = get_dataloader(split="test", batch_size=config["batch_size_test"])
 
-# Create the net_cure model
-transformer = get_transformer()
-inverse_transformer = get_inverse_transformer()
-net_CURE = CURELearner(model, trainloader, testloader, lambda_=lambda_, transformer=transformer,
-                       inverse_transformer=inverse_transformer, device=device, path=checkpoint_path / "best_model.data")
+    # Create the net_cure model
+    transformer = get_transformer()
+    inverse_transformer = get_inverse_transformer()
+    net_CURE = CURELearner(model, trainloader, testloader, lambda_=config["lambda_"], transformer=transformer,
+                           inverse_transformer=inverse_transformer, trial=trial, device=config["device"], path=checkpoint_path / "best_model.data")
 
-# Set the optimizer
-net_CURE.set_optimizer(optim_alg=optimization_algorithm,
-                       args=optimizer_arguments)
+    # Set the optimizer
+    net_CURE.set_optimizer(optim_alg=config["optimization_algorithm"],
+                           args=config["optimizer_arguments"])
 
-# Train the net-cure model
-if use_checkpoint:
-    net_CURE.import_state(checkpoint_file)
+    # Train the net-cure model
+    if config["use_checkpoint"]:
+        net_CURE.import_state(config["checkpoint_file"])
 
-else:
-    net_CURE.train(epochs=epochs, h=h)
+    else:
+        net_CURE.train(epochs=config["epochs"], h=config["h"])
 
-    net_CURE.save_state(checkpoint_path / checkpoint_file)
+        net_CURE.save_state(checkpoint_path / config["checkpoint_file"])
 
-net_CURE.plot_results()
+    if plot_results:
+        net_CURE.plot_results()
+
+    return net_CURE.test_acc_adv
+
+
+if __name__ == "__main__":
+    train_CURE(CIFAR_CONFIG)
