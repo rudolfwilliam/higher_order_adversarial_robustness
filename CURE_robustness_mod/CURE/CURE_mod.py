@@ -206,7 +206,7 @@ class ModCURELearner():
         return high_ordr
     
     def __finite_dif(self, in_0, in_1, infin):
-        return (in_0 + in_1) / infin
+        return (in_0 - in_1) / infin
 
     def regularizer(self, inputs, targets, h=3., lambda_=4):
         z, norm_grad = self._find_z(inputs, targets, h)
@@ -235,10 +235,10 @@ class ModCURELearner():
         loss_2 = self.criterion(self.net.eval()(inputs + self.h_0_), targets)
         loss_3 = self.criterion(self.net.eval()(inputs + self.h_0_ + self.h_2_), targets)
 
-        fin_dif_0 = self.__finite_dif(loss_orig, loss_1, self.h_1_)
-        fin_dif_1 = self.__finite_dif(loss_2, loss_3, self.h_2_)
-        
-        total_fin_dif = self.__finite_dif(fin_dif_0, fin_dif_1, self.h_0_)
+        fin_dif_0 = self.__finite_dif(loss_1, loss_orig, self.h_1_)
+        fin_dif_1 = self.__finite_dif(loss_3, loss_2, self.h_2_)
+
+        total_fin_dif = self.__finite_dif(fin_dif_1, fin_dif_0, self.h_0_)
 
         third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device), create_graph=True)[0]
         # take sum of squared values of third order derivatives
