@@ -21,7 +21,7 @@ from torchvision.transforms import ToTensor, Compose
 
 
 class CURELearner():
-    def __init__(self, net, trainloader, testloader, lambda_=4, transformer=None, inverse_transformer=None, trial=None, device='cuda',
+    def __init__(self, net, trainloader, testloader, lambda_=4, transformer=None, trial=None, image_min=0, image_max=1, device='cuda',
                  path='./checkpoint'):
         '''
         CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
@@ -49,12 +49,6 @@ class CURELearner():
         else:
             self.transformer = transformer
 
-        if inverse_transformer is not None and type(inverse_transformer.transforms[0]) == ToTensor:
-            self.inverse_transformer = Compose(
-                inverse_transformer.transforms[1:])
-        else:
-            self.inverse_transformer = inverse_transformer
-
         self.criterion = nn.CrossEntropyLoss()
         self.trial = trial
         self.device = device
@@ -62,6 +56,8 @@ class CURELearner():
         self.trainloader, self.testloader = trainloader, testloader
         self.path = path
         self.test_acc_adv_best = 0
+        self.image_min = image_min
+        self.image_max = image_max
         self.train_loss, self.train_acc, self.train_curv = [], [], []
         self.test_loss, self.test_acc_adv, self.test_acc_clean, self.test_curv = [], [], [], []
 
@@ -89,7 +85,7 @@ class CURELearner():
             self.scheduler = getattr(optim.lr_scheduler, scheduler)(
                 self.optimizer, **args_scheduler)
 
-    def train(self, h=[3], epochs=15):
+    def train(self, h=[3], epochs=15, epsilon=8/255):
         '''
         Training the network
         ================================================
@@ -113,7 +109,7 @@ class CURELearner():
 
         for epoch, h_tmp in enumerate(h_all):
             self._train(epoch, h=h_tmp)
-            self.test(epoch, h=h_tmp)
+            self.test(epoch, h=h_tmp, eps=epsilon)
 
             # This is used for hyperparameter tuning with optuna
             if self.trial is not None:
@@ -160,7 +156,7 @@ class CURELearner():
         self.train_acc.append(100.*num_correct/total)
         self.train_curv.append(curvature/(batch_idx+1))
 
-    def test(self, epoch, h, num_pgd_steps=20, eps=8, clip_min=0, clip_max=255):
+    def test(self, epoch, h, num_pgd_steps=20, eps=8/255):
         '''
         Testing the model
         '''
@@ -184,7 +180,7 @@ class CURELearner():
             # inputs_pert = inputs_pert + eps * torch.Tensor(r).to(self.device)
 
             inputs_pert = pgd(inputs, self.net, epsilon=eps, targets=targets, step_size=0.04, num_steps=num_pgd_steps,
-                              normalizer=self.transformer, device=self.device, clip_min=clip_min, clip_max=clip_max)
+                              normalizer=self.transformer, device=self.device, clip_min=self.image_min, clip_max=self.image_max)
 
             outputs = self.net(inputs_pert)
             probs, predicted = outputs.max(1)

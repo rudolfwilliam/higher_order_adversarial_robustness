@@ -12,7 +12,7 @@ def train_CURE(config, plot_results=True, trial=None):
     The main function.
     """
 
-    get_dataloader, get_transformer, get_inverse_transformer, get_model = getter(
+    get_dataloader, get_transformer, _, get_model = getter(
         config["dataset"], config["model_name"])
 
     # Construct (and if needed train) model
@@ -27,9 +27,8 @@ def train_CURE(config, plot_results=True, trial=None):
 
     # Create the net_cure model
     transformer = get_transformer()
-    inverse_transformer = get_inverse_transformer()
-    net_CURE = CURELearner(model, trainloader, testloader, lambda_=config["lambda_"], transformer=transformer,
-                           inverse_transformer=inverse_transformer, trial=trial, device=config["device"], path=checkpoint_path / "best_model.data")
+    net_CURE = CURELearner(model, trainloader, testloader, lambda_=config["lambda_"], transformer=transformer, trial=trial,
+                           image_min=config["image_min"], image_max=config["image_max"], device=config["device"], path=checkpoint_path / "best_model.data")
 
     # Set the optimizer
     net_CURE.set_optimizer(optim_alg=config["optimization_algorithm"],
@@ -40,7 +39,7 @@ def train_CURE(config, plot_results=True, trial=None):
         net_CURE.import_state(config["checkpoint_file"])
 
     else:
-        net_CURE.train(epochs=config["epochs"], h=config["h"])
+        net_CURE.train(epochs=config["epochs"], h=config["h"], epsilon=config["epsilon"])
 
         net_CURE.save_state(checkpoint_path / config["checkpoint_file"])
 
