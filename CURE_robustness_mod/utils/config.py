@@ -15,7 +15,7 @@ CIFAR_CONFIG = {
     # CURE configurations
     "lambda_": 1,
     "h": [0.1, 0.4, 0.8, 1.8, 3],
-    "optimization_algorithm": 'SGD',
+    "optimization_algorithm": 'Adam',
     "optimizer_arguments": {
         'lr': 1e-4
     },

@@ -58,9 +58,10 @@ def pgd(inputs, net, epsilon=8, targets=None, step_size=0.04, num_steps=20, norm
     # If the images are normalized, normalize also 'epsilon' and the boundaries of the image domain
     # ('clip_min' and 'clip_max')
     if normalizer is not None:
-        epsilon = normalizer(torch.tensor(epsilon, dtype=torch.float32).view(1, 1, 1, 1)).to(device)
-        clip_min = normalizer(torch.tensor(clip_min, dtype=torch.float32).view(1, 1, 1, 1)).to(device)
-        clip_max = normalizer(torch.tensor(clip_max, dtype=torch.float32).view(1, 1, 1, 1)).to(device)
+        epsilon = epsilon / (clip_max - clip_min)
+        clip_min = normalizer(torch.tensor(clip_min, dtype=torch.float32).view(1, 1, 1, 1)).to(device).view([])
+        clip_max = normalizer(torch.tensor(clip_max, dtype=torch.float32).view(1, 1, 1, 1)).to(device).view([])
+        epsilon = epsilon * (clip_max - clip_min)
 
     # The perturbed images
     pert_images = inputs.detach().clone().to(device).requires_grad_(True)

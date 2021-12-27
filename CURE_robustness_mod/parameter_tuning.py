@@ -14,7 +14,7 @@ def objective(trial):
 
     # Let optuna select a the tunable parameters
     config["lambda_"] = trial.suggest_uniform('lambda_', 0, 15)
-    config["optimization_algorithm"] = trial.suggest_categorical("optimization_algorithm", ['SGD', 'Adam'])
+    #config["optimization_algorithm"] = trial.suggest_categorical("optimization_algorithm", ['SGD', 'Adam'])
     config["optimizer_arguments"]["lr"] = trial.suggest_loguniform('lr', 1e-8, 1e-2)
 
     for i in range(5):

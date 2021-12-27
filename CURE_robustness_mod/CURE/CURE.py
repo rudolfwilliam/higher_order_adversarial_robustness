@@ -160,7 +160,7 @@ class CURELearner():
         self.train_acc.append(100.*num_correct/total)
         self.train_curv.append(curvature/(batch_idx+1))
 
-    def test(self, epoch, h, num_pgd_steps=20, eps=8/255, clip_min=0, clip_max=1):
+    def test(self, epoch, h, num_pgd_steps=20, eps=8, clip_min=0, clip_max=255):
         '''
         Testing the model
         '''
