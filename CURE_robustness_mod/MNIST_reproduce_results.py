@@ -97,7 +97,8 @@ testloader = torch.utils.data.DataLoader(
               batch_size=batch_size_test, shuffle=True)
 
 
-net_CURE = ModCURELearner(network, trainloader, testloader, lambda_0_=1, lambda_1_=1, lambda_2_=1, device='cpu', path="./checkpoint/best_model.data")
+net_CURE = ModCURELearner(network, trainloader, testloader, lambda_0_=1, lambda_1_=1, lambda_2_=1.e-4, 
+                          h_0_=1.e-1, h_1_=1.e-1, h_2_=1.e-1, device='cpu', path="./checkpoint/best_model.data")
 
 # **Set the optimizer**
 

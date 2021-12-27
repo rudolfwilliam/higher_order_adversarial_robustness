@@ -19,8 +19,8 @@ from torch.distributions import uniform
 
 
 class ModCURELearner():
-    def __init__(self, net, trainloader, testloader, device='cpu', lambda_0_ = 4, 
-                 lambda_1_ = 4, lambda_2_ = 4, path='./checkpoint'):
+    def __init__(self, net, trainloader, testloader, device='cpu', lambda_0_ = 10, 
+                 lambda_1_ = 10, lambda_2_=1.e-4, h_0_=1.e-1, h_1_=1.e-1, h_2_=1.e-1, path='./checkpoint'):
         '''
         CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
                     in https://arxiv.org/abs/1811.09716
@@ -47,6 +47,9 @@ class ModCURELearner():
         self.lambda_0_ = lambda_0_
         self.lambda_1_ = lambda_1_ 
         self.lambda_2_ = lambda_2_
+        self.h_0_ = h_0_
+        self.h_1_ = h_1_
+        self.h_2_ = h_2_
         self.trainloader, self.testloader = trainloader, testloader
         self.path = path
         self.test_acc_adv_best = 0
@@ -201,13 +204,14 @@ class ModCURELearner():
     def elementwise_diff(self, low_ordr, inputs):
         high_ordr = torch.autograd.grad(low_ordr, inputs, grad_outputs=torch.ones(low_ordr.size()).to(self.device), create_graph=True, retain_graph=True)[0].requires_grad_()
         return high_ordr
+    
+    def __finite_dif(self, in_0, in_1, infin):
+        return (in_0 + in_1) / infin
 
     def regularizer(self, inputs, targets, h=3., lambda_=4):
         z, norm_grad = self._find_z(inputs, targets, h)
 
-
         inputs.requires_grad_()
-        outputs_pos = self.net.eval()(inputs + z)
         outputs_orig = self.net.eval()(inputs)
         loss_orig = self.criterion(outputs_orig, targets)
 
@@ -217,6 +221,7 @@ class ModCURELearner():
         self.net.zero_grad()
 
         # second order regularization (original CURE)
+        outputs_pos = self.net.eval()(inputs + z)
         loss_pos = self.criterion(outputs_pos, targets)
         grad_diff = \
         torch.autograd.grad((loss_pos - loss_orig), inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
@@ -225,12 +230,19 @@ class ModCURELearner():
         reg_1 = torch.sum(pre * self.lambda_1_)
         self.net.zero_grad()
 
-        # third order regularization
-        first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device), create_graph=True, retain_graph=True)[0].requires_grad_()
-        scnd_order = self.elementwise_diff(first_order, inputs)
-        third_order = self.elementwise_diff(scnd_order, inputs)
+        # third order regularization with approximation
+        loss_1 = self.criterion(self.net.eval()(inputs + self.h_1_), targets) 
+        loss_2 = self.criterion(self.net.eval()(inputs + self.h_0_), targets)
+        loss_3 = self.criterion(self.net.eval()(inputs + self.h_0_ + self.h_2_), targets)
+
+        fin_dif_0 = self.__finite_dif(loss_orig, loss_1, self.h_1_)
+        fin_dif_1 = self.__finite_dif(loss_2, loss_3, self.h_2_)
+        
+        total_fin_dif = self.__finite_dif(fin_dif_0, fin_dif_1, self.h_0_)
+
+        third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device), create_graph=True)[0]
         # take sum of squared values of third order derivatives
-        reg_2 = torch.sum(torch.pow(third_order, 2) * self.lambda_2_) 
+        reg_2 = torch.sum(torch.pow(third_order_approx, 2) * self.lambda_2_) 
         self.net.zero_grad()
 
         return (reg_0 + reg_1 + reg_2) / float(inputs.size(0)), norm_grad
