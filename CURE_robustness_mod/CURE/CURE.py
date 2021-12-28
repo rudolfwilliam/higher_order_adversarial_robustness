@@ -225,6 +225,9 @@ class CURELearner():
 
         return z, norm_grad
 
+    def _finite_dif(self, in_0, in_1, infin):
+        return (in_0 - in_1) / infin
+
     def regularizer(self, inputs, targets, h=3., lambda_=4):
         '''
         Regularizer term in CURE
@@ -232,19 +235,47 @@ class CURELearner():
         z, norm_grad = self._find_z(inputs, targets, h)
 
         inputs.requires_grad_()
-        outputs_pos = self.net.eval()(inputs + z)
         outputs_orig = self.net.eval()(inputs)
-
-        loss_pos = self.criterion(outputs_pos, targets)
         loss_orig = self.criterion(outputs_orig, targets)
+
+        # first order regularization
+        #first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
+        #                                create_graph=True)[0].requires_grad_()
+        first_order = torch.autograd.grad(loss_orig, inputs, create_graph=True)[0].requires_grad_()
+        # TODO: lambda -> lambda_0
+        reg_0 = torch.sum(torch.pow(first_order, 2) * lambda_)
+        self.net.zero_grad()
+
+
+        # second order regularization
+        outputs_pos = self.net.eval()(inputs + z)
+        loss_pos = self.criterion(outputs_pos, targets)
+
         # grad_diff = torch.autograd.grad((loss_pos-loss_orig), inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
         #                                create_graph=True)[0]
         grad_diff = torch.autograd.grad(
             (loss_pos-loss_orig), inputs, create_graph=True)[0]
-        reg = grad_diff.reshape(grad_diff.size(0), -1).norm(dim=1)
+        pre = grad_diff.reshape(grad_diff.size(0), -1).norm(dim=1)
+        reg_1 = torch.sum(self.lambda_ * pre)
         self.net.zero_grad()
 
-        return torch.sum(self.lambda_ * reg) / float(inputs.size(0)), norm_grad
+        # third order regularization
+        loss_1 = self.criterion(self.net.eval()(inputs + z), targets)
+        loss_2 = self.criterion(self.net.eval()(inputs + z), targets)
+        loss_3 = self.criterion(self.net.eval()(inputs + z + z), targets)
+
+        fin_dif_0 = self._finite_dif(loss_orig, loss_1, h)
+        fin_dif_1 = self._finite_dif(loss_2, loss_3, h)
+
+        total_fin_dif = self._finite_dif(fin_dif_0, fin_dif_1, h)
+
+        #third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
+        #                                create_graph=True)[0]
+        third_order_approx = torch.autograd.grad(total_fin_dif, inputs, create_graph=True)[0]
+        reg_2 = torch.sum(torch.pow(third_order_approx, 2) * self.lambda_)
+        self.net.zero_grad()
+
+        return (reg_0 + reg_1 + reg_2 ) / float(inputs.size(0)), norm_grad
 
     def save_model(self, path):
         '''
@@ -317,7 +348,7 @@ class CURELearner():
         plt.plot(self.train_curv, Linewidth=2, c='C0')
         plt.plot(self.test_curv, Linewidth=2, c='C1')
         plt.legend(['train_curv', 'test_curv'], fontsize=14)
-        plt.title('Curvataure', fontsize=14)
+        plt.title('Curvature', fontsize=14)
         plt.ylabel('curv', fontsize=14)
         plt.xlabel('epoch', fontsize=14)
         plt.grid()

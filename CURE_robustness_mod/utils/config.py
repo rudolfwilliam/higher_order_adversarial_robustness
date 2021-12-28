@@ -4,7 +4,7 @@ CIFAR_CONFIG = {
     "device": "cuda",
 
     # Data parameters
-    "batch_size_train": 100,  # E: For some reasons the bugs want this to be 100 for cifar
+    "batch_size_train": 100,  # E: Bugs want this to be 100 for cifar
     "batch_size_test": 1000,
     "shuffle_train": True,
     "image_min": 0,
@@ -13,7 +13,7 @@ CIFAR_CONFIG = {
 
     # Getter functions
     "dataset": 'CIFAR10',
-    "model_name": 'ResNet18',  # SimpleModel or ResNet18
+    "model_name": 'VGG',  # SimpleModel or ResNet18
 
     # CURE configurations
     "lambda_": 4,

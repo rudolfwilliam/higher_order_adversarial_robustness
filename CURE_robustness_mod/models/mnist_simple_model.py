@@ -6,7 +6,7 @@ import torchvision
 import torch
 from torch import nn
 import torch.nn.functional as F
-from data.getter import DataGetter
+from data.dgetter import DataGetter
 
 
 class SimpleModel(nn.Module):
