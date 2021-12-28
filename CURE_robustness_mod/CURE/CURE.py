@@ -21,7 +21,7 @@ from torchvision.transforms import ToTensor, Compose
 
 
 class CURELearner():
-    def __init__(self, net, trainloader, testloader, lambda_=4, transformer=None, trial=None, image_min=0, image_max=1, device='cuda',
+    def __init__(self, net, trainloader, testloader,  lambda_0=4, lambda_1=4, lambda_2=0, mu_0=4, mu_1=0, mu_2=0, transformer=None, trial=None, image_min=0, image_max=1, device='cuda',
                  path='./checkpoint'):
         '''
         CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
@@ -52,7 +52,12 @@ class CURELearner():
         self.criterion = nn.CrossEntropyLoss()
         self.trial = trial
         self.device = device
-        self.lambda_ = lambda_
+        self.lambda_0 = lambda_0
+        self.lambda_1 = lambda_1
+        self.lambda_2 = lambda_2
+        self.mu_0 = mu_0
+        self.mu_1 = mu_1
+        self.mu_2 = mu_2
         self.trainloader, self.testloader = trainloader, testloader
         self.path = path
         self.test_acc_adv_best = 0
@@ -228,10 +233,10 @@ class CURELearner():
     def _finite_dif(self, in_0, in_1, infin):
         return (in_0 - in_1) / infin
 
-    def regularizer(self, inputs, targets, h=3., lambda_=4):
-        '''
-        Regularizer term in CURE
-        '''
+    def _3_diff(self,in_0,in_1,in_2,infin):
+        return (in_0-2*in_1+in_2)/infin
+
+    def regularizer(self, inputs, targets, h=3.):
         z, norm_grad = self._find_z(inputs, targets, h)
 
         inputs.requires_grad_()
@@ -243,7 +248,7 @@ class CURELearner():
         #                                create_graph=True)[0].requires_grad_()
         first_order = torch.autograd.grad(loss_orig, inputs, create_graph=True)[0].requires_grad_()
         # TODO: lambda -> lambda_0
-        reg_0 = torch.sum(torch.pow(first_order, 2) * lambda_)
+        reg_0 = torch.sum(torch.pow(first_order, 2) * self.lambda_0)
         self.net.zero_grad()
 
 
@@ -256,26 +261,39 @@ class CURELearner():
         grad_diff = torch.autograd.grad(
             (loss_pos-loss_orig), inputs, create_graph=True)[0]
         pre = grad_diff.reshape(grad_diff.size(0), -1).norm(dim=1)
-        reg_1 = torch.sum(self.lambda_ * pre)
+        reg_1 = torch.sum(self.lambda_1 * pre)
         self.net.zero_grad()
 
         # third order regularization
-        loss_1 = self.criterion(self.net.eval()(inputs + z), targets)
-        loss_2 = self.criterion(self.net.eval()(inputs + z), targets)
-        loss_3 = self.criterion(self.net.eval()(inputs + z + z), targets)
 
-        fin_dif_0 = self._finite_dif(loss_orig, loss_1, h)
-        fin_dif_1 = self._finite_dif(loss_2, loss_3, h)
+        loss_1 = self.criterion(self.net.eval()(inputs - h*torch.ones_like(inputs)), targets)
+        loss_2 = self.criterion(self.net.eval()(inputs), targets)
+        loss_3 = self.criterion(self.net.eval()(inputs + h*torch.ones_like(inputs)), targets)
+        """
+        loss_1 = self.criterion(self.net.eval()(inputs - h*z), targets)
+        loss_2 = self.criterion(self.net.eval()(inputs), targets)
+        loss_3 = self.criterion(self.net.eval()(inputs + h*z), targets)
+        """
 
-        total_fin_dif = self._finite_dif(fin_dif_0, fin_dif_1, h)
+
+        total_fin_dif = self._3_diff(loss_1,loss_2,loss_3,h)
 
         #third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
         #                                create_graph=True)[0]
         third_order_approx = torch.autograd.grad(total_fin_dif, inputs, create_graph=True)[0]
-        reg_2 = torch.sum(torch.pow(third_order_approx, 2) * self.lambda_)
+        #third_order_approx = total_fin_dif
+        reg_2 = torch.sum(torch.pow(third_order_approx, 2) * self.lambda_2)
         self.net.zero_grad()
 
-        return (reg_0 + reg_1 + reg_2 ) / float(inputs.size(0)), norm_grad
+        # first order finite difference regularizer
+
+        # first order finite difference regularizer
+        third_order_approx = total_fin_dif
+        reg_3 = torch.sum(torch.pow(third_order_approx, 2) * self.mu_2)
+
+        # first order finite difference regularizer
+
+        return (reg_0 + reg_1 + reg_2 + reg_3) / float(inputs.size(0)), norm_grad
 
     def save_model(self, path):
         '''

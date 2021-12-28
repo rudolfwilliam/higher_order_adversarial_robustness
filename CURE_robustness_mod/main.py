@@ -4,7 +4,7 @@
 from getter import getter
 from pathlib import Path
 from CURE.CURE import CURELearner
-from utils.config import CIFAR_CONFIG, CIFAR_CONFIG_RESNET20
+from utils.config import CIFAR_CONFIG #, CIFAR_CONFIG_RESNET20
 
 
 def train_CURE(config, plot_results=True, trial=None):
@@ -27,7 +27,7 @@ def train_CURE(config, plot_results=True, trial=None):
 
     # Create the net_cure model
     transformer = get_transformer()
-    net_CURE = CURELearner(model, trainloader, testloader, lambda_=config["lambda_"], transformer=transformer, trial=trial,
+    net_CURE = CURELearner(model, trainloader, testloader, lambda_0=config["lambda_0"], lambda_1=config["lambda_1"], lambda_2=config["lambda_2"], transformer=transformer, trial=trial,
                            image_min=config["image_min"], image_max=config["image_max"], device=config["device"], path=checkpoint_path / "best_model.data")
 
     # Set the optimizer
@@ -50,4 +50,4 @@ def train_CURE(config, plot_results=True, trial=None):
 
 
 if __name__ == "__main__":
-    train_CURE(CIFAR_CONFIG_RESNET20)
+    train_CURE(CIFAR_CONFIG)

@@ -38,7 +38,7 @@ class ModelGetter():
         # If the model does not yet exists, train it
         if not model_path.exists():
             print("Train model")
-            self.train_simple_model(n_epochs=10, learning_rate=0.01,
+            self.train_simple_model(n_epochs=50, learning_rate=0.01,
                                      momentum=0.5, seed=1, log_interval=10)
 
         # Finally, load the model

@@ -11,6 +11,7 @@ def getter(dataset, modelname):
         get_transformer = dgetter.get_transformer
         get_inverse_transformer = dgetter.get_inverse_transformer
 
+        print(modelname)
         if modelname == 'SimpleModel':
             from models.cifar_simple_model import ModelGetter
             get_model = ModelGetter(dgetter, 'cifar_simple_model').get_simple_model
