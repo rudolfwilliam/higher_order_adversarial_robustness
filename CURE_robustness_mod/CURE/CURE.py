@@ -6,7 +6,7 @@ import torch.nn as nn
 from utils.utils import progress_bar
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.utils import pgd
+from utils.utils import pgd, pgd_original
 import torchvision
 import os
 import torch

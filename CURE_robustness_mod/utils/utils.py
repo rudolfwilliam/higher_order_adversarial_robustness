@@ -59,9 +59,15 @@ def pgd(inputs, net, epsilon=8, targets=None, step_size=0.04, num_steps=20, norm
     # ('clip_min' and 'clip_max')
     if normalizer is not None:
         epsilon = epsilon / (clip_max - clip_min)
-        clip_min = normalizer(torch.tensor(clip_min, dtype=torch.float32).view(1, 1, 1, 1)).to(device).view([])
-        clip_max = normalizer(torch.tensor(clip_max, dtype=torch.float32).view(1, 1, 1, 1)).to(device).view([])
+        #clip_min = normalizer(torch.tensor(clip_min, dtype=torch.float32).view(1, 1, 1, 1)).to(device).view([])
+        #clip_max = normalizer(torch.tensor(clip_max, dtype=torch.float32).view(1, 1, 1, 1)).to(device).view([])
+        clip_min = normalizer(torch.repeat_interleave(torch.tensor(clip_min, dtype=torch.float32), 3).view(1, 3, 1, 1)).to(device)
+        clip_max = normalizer(torch.repeat_interleave(torch.tensor(clip_max, dtype=torch.float32), 3).view(1, 3, 1, 1)).to(device)
         epsilon = epsilon * (clip_max - clip_min)
+
+    # Compute the maximum perturbation
+    pert_max = inputs.detach().clone().to(device).requires_grad_(False) + epsilon
+    pert_min = inputs.detach().clone().to(device).requires_grad_(False) - epsilon
 
     # The perturbed images
     pert_images = inputs.detach().clone().to(device).requires_grad_(True)
@@ -85,10 +91,16 @@ def pgd(inputs, net, epsilon=8, targets=None, step_size=0.04, num_steps=20, norm
             loss_wrt_label, pert_images, only_inputs=True, create_graph=False, retain_graph=False)[0]
 
         # Update the perturbed images with small perturbations
-        pert_images = pert_images + epsilon * grad.sign()
+        pert_images = pert_images + step_size * grad.sign()
 
         # Project the images back into the image-domain
         pert_images.clamp_(min=clip_min, max=clip_max)
+
+        # Project the images back into the epsilon-box around the input images
+        pert_images.clamp_(min=pert_min, max=pert_max)
+
+    # Project the images back into the image-domain
+    pert_images.clamp_(min=clip_min, max=clip_max)
 
     return pert_images
 
@@ -142,6 +154,58 @@ def pgd_old(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=2
     r_tot = r_tot / regul
 
     return r_tot.cpu()
+
+
+def pgd_original(inputs, net, targets=None, step_size=0.04, num_steps=20, epsilon=5./255.*8, normalizer=None, clip_min=0, clip_max=255, device="cpu"):
+    """
+       :param image: Image of size HxWx3
+       :param net: network (input: images, output: values of activation **BEFORE** softmax).
+       :param num_classes: num_classes (limits the number of classes to test against, by default = 10)
+       :param overshoot: used as a termination criterion to prevent vanishing updates (default = 0.02).
+       :param max_iter: maximum number of iterations for deepfool (default = 50)
+       :return: minimal perturbation that fools the classifier, number of iterations that it required, new estimated_label and
+       perturbed image
+    """
+    input_shape = inputs.shape
+    pert_image = inputs.clone().to(device)
+    w = torch.zeros(input_shape)
+    r_tot = torch.zeros(input_shape)
+
+    denormal = transforms.Compose([transforms.Normalize((0., 0., 0.), (1/0.2023, 1/0.1994, 1/0.2010)),
+                                   transforms.Normalize((-0.4914, -0.4822, -0.4465), (1., 1., 1.))])
+    normal = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+
+    pert_image = pert_image + (torch.rand(inputs.shape).to(device)-0.5)*2*epsilon
+    pert_image = pert_image.to(device)
+
+    for ii in range(num_steps):
+        pert_image.requires_grad_()
+        zero_gradients(pert_image)
+        fs = net.eval()(pert_image)
+        loss_wrt_label = nn.CrossEntropyLoss()(fs, targets)
+        grad = torch.autograd.grad(loss_wrt_label, pert_image, only_inputs=True, create_graph=True, retain_graph=False)[0]
+
+        dr = torch.sign(grad.data)
+        pert_image.detach_()
+        pert_image += dr * step_size
+        for i in range(inputs.size(0)):
+            pert_image[i] = torch.min(torch.max(pert_image[i], inputs[i] - epsilon), inputs[i] + epsilon)
+            pert_image[i] = pert_image[i] / torch.Tensor([1/0.2023, 1/0.1994, 1/0.2010]).view(3, 1, 1).to(device)
+            pert_image[i] -= torch.Tensor([-0.4914, -0.4822, -0.4465]).view(3, 1, 1).to(device)
+            pert_image[i] = torch.clamp(pert_image[i], 0., 1.)
+            pert_image[i] = (pert_image[i] - torch.Tensor([0.4914, 0.4822, 0.4465]).view(3, 1, 1).to(device))
+            pert_image[i] /= torch.Tensor([0.2023, 0.1994, 0.2010]).view(3, 1, 1).to(device)
+
+            #pert_image[i] = normal(torch.clamp(pert_image[i], 0., 1.))[None, :, :, :]
+
+    r_tot = pert_image - inputs
+    regul = np.linalg.norm(r_tot.cpu().flatten(start_dim=1, end_dim=-1), np.inf, axis=1)
+    regul = torch.Tensor(regul).view(-1, 1, 1, 1).to(device)
+    r_tot = r_tot / regul
+
+    inputs_pert = inputs.to(device) + epsilon * r_tot.to(device)
+
+    return inputs_pert
 
 
 TOTAL_BAR_LENGTH = 65.

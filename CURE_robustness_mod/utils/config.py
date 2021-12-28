@@ -28,3 +28,6 @@ CIFAR_CONFIG = {
     "use_checkpoint": False,
     "checkpoint_file": 'checkpoint_01.data'
 }
+
+CIFAR_CONFIG_RESNET20 = CIFAR_CONFIG
+CIFAR_CONFIG_RESNET20["model_name"] = 'ResNet20'
