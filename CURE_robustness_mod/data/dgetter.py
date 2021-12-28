@@ -20,8 +20,10 @@ class DataGetter():
             return torchvision.transforms.Compose([
                 ToTensor(),
                 # Normalize((0.49139968, 0.48215841, 0.44653091), (0.24703223, 0.24348513, 0.26158784))
+                Normalize((0.4914, 0.4822, 0.4465),
+                          (0.2023, 0.1994, 0.2010))
                 # Normalize((125.30691805, 122.95039414, 113.86538318), (62.99321928, 62.08870764, 66.70489964))
-                Normalize(0.5, 0.5)
+                # Normalize(0.5, 0.5)
             ])
 
     def get_inverse_transformer(self):
