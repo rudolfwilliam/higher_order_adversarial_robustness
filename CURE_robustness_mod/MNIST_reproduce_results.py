@@ -15,7 +15,8 @@ if os.getcwd().endswith('notebooks'):
 
 
 from CURE.CURE_mod import ModCURELearner
-from simple_MNIST_model import Net
+from CURE.CURE_high_acc import HighAcc_CURELearner
+from models.mnist_simple_model import SimpleModel
 import matplotlib.pyplot as plt
 import torchvision
 from torchvision.datasets import MNIST
@@ -55,7 +56,7 @@ if train:
     torch.backends.cudnn.enabled = False
     torch.manual_seed(random_seed)
 
-    network = Net()
+    network = SimpleModel()
     optimizer = optim.SGD(network.parameters(), lr=learning_rate, momentum=momentum)
 
     def train(epoch, trainloader, optimizer, log_interval, train_losses, train_counter):
@@ -77,7 +78,7 @@ if train:
     for epoch in range(1, n_epochs + 1):
         train(epoch, trainloader=trainloader, optimizer=optimizer, log_interval=log_interval, train_losses=train_losses, train_counter=train_counter)
 else:
-    network = Net()
+    network = SimpleModel()
     network.load_state_dict(torch.load("./pretrained/MNIST_model.pth"))
 
 trainloader = torch.utils.data.DataLoader(
@@ -97,7 +98,7 @@ testloader = torch.utils.data.DataLoader(
               batch_size=batch_size_test, shuffle=True)
 
 
-net_CURE = ModCURELearner(network, trainloader, testloader, lambda_0_=1, lambda_1_=1, lambda_2_=1, device='cpu', path="./checkpoint/best_model.data")
+net_CURE = HighAcc_CURELearner(network, trainloader, testloader, device='cpu', path="./checkpoint/best_model.data")
 
 # **Set the optimizer**
 
