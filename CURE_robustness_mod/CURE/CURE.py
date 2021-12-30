@@ -63,8 +63,10 @@ class CURELearner():
         self.test_acc_adv_best = 0
         self.image_min = image_min
         self.image_max = image_max
-        self.train_loss, self.train_acc, self.train_curv = [], [], []
-        self.test_loss, self.test_acc_adv, self.test_acc_clean, self.test_curv = [], [], [], []
+        self.train_loss, self.train_acc = [], []
+        self.test_loss, self.test_acc_adv, self.test_acc_clean = [], [], []
+        self.train_curv_0, self.train_curv_1, self.train_curv_2, self.train_curv_3 = [], [], [], []
+        self.test_curv_0, self.test_curv_1, self.test_curv_2, self.test_curv_3 = [], [], [], []
 
     def set_optimizer(self, optim_alg='Adam', args={'lr': 1e-4}, scheduler=None, args_scheduler={}):
         '''
@@ -134,15 +136,21 @@ class CURELearner():
         train_loss, total = 0, 0
         num_correct = 0
         curv, curvature, norm_grad_sum = 0, 0, 0
+        curvature_0, curvature_1, curvature_2, curvature_3 = 0, 0, 0, 0
+
         for batch_idx, (inputs, targets) in enumerate(self.trainloader):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
             total += targets.size(0)
             outputs = self.net.train()(inputs)
 
-            regularizer, grad_norm = self.regularizer(inputs, targets, h=h)
+            regularizer, grad_norm, curvatures_split_up = self.regularizer(inputs, targets, h=h)
 
             curvature += regularizer.item()
+            curvature_0 += curvatures_split_up[0].item()
+            curvature_1 += curvatures_split_up[1].item()
+            curvature_2 += curvatures_split_up[2].item()
+            curvature_3 += curvatures_split_up[3].item()
             neg_log_likelihood = self.criterion(outputs, targets)
             loss = neg_log_likelihood + regularizer
             loss.backward()
@@ -160,12 +168,17 @@ class CURELearner():
         self.train_loss.append(train_loss/(batch_idx+1))
         self.train_acc.append(100.*num_correct/total)
         self.train_curv.append(curvature/(batch_idx+1))
+        self.train_curv_0.append(curvature_0 / (batch_idx + 1))
+        self.train_curv_1.append(curvature_1 / (batch_idx + 1))
+        self.train_curv_2.append(curvature_2 / (batch_idx + 1))
+        self.train_curv_3.append(curvature_3 / (batch_idx + 1))
 
     def test(self, epoch, h, num_pgd_steps=20, eps=8/255):
         '''
         Testing the model
         '''
         test_loss, adv_acc, total, curvature, clean_acc, grad_sum = 0, 0, 0, 0, 0, 0
+        curvature_0, curvature_1, curvature_2, curvature_3 = 0, 0, 0, 0
 
         for batch_idx, (inputs, targets) in enumerate(self.testloader):
 
@@ -190,9 +203,13 @@ class CURELearner():
             outputs = self.net(inputs_pert)
             probs, predicted = outputs.max(1)
             adv_acc += predicted.eq(targets).sum().item()
-            cur, norm_grad = self.regularizer(inputs, targets, h=h)
+            cur, norm_grad, curvatures_split_up = self.regularizer(inputs, targets, h=h)
             grad_sum += norm_grad
             curvature += cur.item()
+            curvature_0 += curvatures_split_up[0].item()
+            curvature_1 += curvatures_split_up[1].item()
+            curvature_2 += curvatures_split_up[2].item()
+            curvature_3 += curvatures_split_up[3].item()
             test_loss += cur.item()
 
         print(f'epoch = {epoch}, adv_acc = {100.*adv_acc/total}, clean_acc = {100.*clean_acc/total}, loss = {test_loss/(batch_idx+1)}',
@@ -202,6 +219,10 @@ class CURELearner():
         self.test_acc_adv.append(100.*adv_acc/total)
         self.test_acc_clean.append(100.*clean_acc/total)
         self.test_curv.append(curvature/(batch_idx+1))
+        self.test_curv_0.append(curvature_0 / (batch_idx + 1))
+        self.test_curv_1.append(curvature_1 / (batch_idx + 1))
+        self.test_curv_2.append(curvature_2 / (batch_idx + 1))
+        self.test_curv_3.append(curvature_3 / (batch_idx + 1))
         if self.test_acc_adv[-1] > self.test_acc_adv_best:
             self.test_acc_adv_best = self.test_acc_adv[-1]
             print(f'Saving the best model to {self.path}')
@@ -233,7 +254,7 @@ class CURELearner():
     def _finite_dif(self, in_0, in_1, infin):
         return (in_0 - in_1) / infin
 
-    def _3_diff(self,in_0,in_1,in_2,infin):
+    def _3_diff(self, in_0, in_1, in_2, infin):
         return (in_0-2*in_1+in_2)/infin
 
     def regularizer(self, inputs, targets, h=3.):
@@ -244,13 +265,12 @@ class CURELearner():
         loss_orig = self.criterion(outputs_orig, targets)
 
         # first order regularization
-        #first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
+        # first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
         #                                create_graph=True)[0].requires_grad_()
         first_order = torch.autograd.grad(loss_orig, inputs, create_graph=True)[0].requires_grad_()
         # TODO: lambda -> lambda_0
         reg_0 = torch.sum(torch.pow(first_order, 2) * self.lambda_0)
         self.net.zero_grad()
-
 
         # second order regularization
         outputs_pos = self.net.eval()(inputs + z)
@@ -275,10 +295,9 @@ class CURELearner():
         loss_3 = self.criterion(self.net.eval()(inputs + h*z), targets)
         """
 
+        total_fin_dif = self._3_diff(loss_1, loss_2, loss_3, h)
 
-        total_fin_dif = self._3_diff(loss_1,loss_2,loss_3,h)
-
-        #third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
+        # third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
         #                                create_graph=True)[0]
         third_order_approx = torch.autograd.grad(total_fin_dif, inputs, create_graph=True)[0]
         #third_order_approx = total_fin_dif
@@ -293,7 +312,7 @@ class CURELearner():
 
         # first order finite difference regularizer
 
-        return (reg_0 + reg_1 + reg_2 + reg_3) / float(inputs.size(0)), norm_grad
+        return (reg_0 + reg_1 + reg_2 + reg_3) / float(inputs.size(0)), norm_grad, [reg_0, reg_1, reg_2, reg_3]
 
     def save_model(self, path):
         '''
@@ -324,6 +343,14 @@ class CURELearner():
             'test_acc_adv': self.test_acc_adv,
             'train_curv': self.train_curv,
             'test_curv': self.test_curv,
+            'train_curv_0': self.train_curv_0,
+            'train_curv_1': self.train_curv_1,
+            'train_curv_2': self.train_curv_2,
+            'train_curv_3': self.train_curv_3,
+            'test_curv_0': self.test_curv_0,
+            'test_curv_1': self.test_curv_1,
+            'test_curv_2': self.test_curv_2,
+            'test_curv_3': self.test_curv_3,
             'train_loss': self.train_loss,
             'test_loss': self.test_loss
         }
@@ -344,6 +371,14 @@ class CURELearner():
         self.test_acc_adv = checkpoint['test_acc_adv']
         self.train_curv = checkpoint['train_curv']
         self.test_curv = checkpoint['test_curv']
+        self.train_curv_0 = checkpoint['train_curv_0'],
+        self.train_curv_1 = checkpoint['train_curv_1'],
+        self.train_curv_2 = checkpoint['train_curv_2'],
+        self.train_curv_3 = checkpoint['train_curv_3'],
+        self.test_curv_0 = checkpoint['test_curv_0'],
+        self.test_curv_1 = checkpoint['test_curv_1'],
+        self.test_curv_2 = checkpoint['test_curv_2'],
+        self.test_curv_3 = checkpoint['test_curv_3'],
         self.train_loss = checkpoint['train_loss']
         self.test_loss = checkpoint['test_loss']
 
@@ -351,9 +386,9 @@ class CURELearner():
         """
         Plotting the results
         """
-        plt.figure(figsize=(15, 12))
+        plt.figure(figsize=(18, 12))
         plt.suptitle('Results', fontsize=18, y=0.96)
-        plt.subplot(3, 3, 1)
+        plt.subplot(4, 4, 1)
         plt.plot(self.train_acc, Linewidth=2, c='C0')
         plt.plot(self.test_acc_clean, Linewidth=2, c='C1')
         plt.plot(self.test_acc_adv, Linewidth=2, c='C2')
@@ -362,17 +397,31 @@ class CURELearner():
         plt.ylabel('Accuracy', fontsize=14)
         plt.xlabel('epoch', fontsize=14)
         plt.grid()
-        plt.subplot(3, 3, 2)
-        plt.plot(self.train_curv, Linewidth=2, c='C0')
-        plt.plot(self.test_curv, Linewidth=2, c='C1')
-        plt.legend(['train_curv', 'test_curv'], fontsize=14)
-        plt.title('Curvature', fontsize=14)
+        plt.subplot(4, 4, 2)
+        plt.plot(self.train_curv_0, Linewidth=2, c='C0')
+        plt.plot(self.train_curv_1, Linewidth=2, c='C1')
+        plt.plot(self.train_curv_2, Linewidth=2, c='C2')
+        plt.plot(self.train_curv_3, Linewidth=2, c='C3')
+        plt.legend(['train_curv_0', 'train_curv_1', 'train_curv_2', 'train_curv_3'], fontsize=14)
+        plt.title('Train Curvatures', fontsize=14)
         plt.ylabel('curv', fontsize=14)
         plt.xlabel('epoch', fontsize=14)
         plt.grid()
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
-        plt.subplot(3, 3, 3)
+        plt.subplot(4, 4, 3)
+        plt.plot(self.test_curv_0, Linewidth=2, c='C0')
+        plt.plot(self.test_curv_1, Linewidth=2, c='C1')
+        plt.plot(self.test_curv_2, Linewidth=2, c='C2')
+        plt.plot(self.test_curv_3, Linewidth=2, c='C3')
+        plt.legend(['test_curv_0', 'test_curv_1', 'test_curv_2', 'test_curv_3'], fontsize=14)
+        plt.title('Test Curvatures', fontsize=14)
+        plt.ylabel('curv', fontsize=14)
+        plt.xlabel('epoch', fontsize=14)
+        plt.grid()
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        plt.subplot(4, 4, 4)
         plt.plot(self.train_loss, Linewidth=2, c='C0')
         plt.plot(self.test_loss, Linewidth=2, c='C1')
         plt.legend(['train', 'test'], fontsize=14)

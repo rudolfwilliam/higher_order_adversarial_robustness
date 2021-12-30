@@ -10,10 +10,9 @@ CIFAR_CONFIG = {
     "image_min": 0,
     "image_max": 1,
 
-
     # Getter functions
     "dataset": 'CIFAR10',
-    "model_name": 'SimpleModel',  # SimpleModel or ResNet18
+    "model_name": 'ResNet18',  # SimpleModel or ResNet18
 
     # CURE configurations
     "lambda_0": 4,
@@ -27,12 +26,12 @@ CIFAR_CONFIG = {
     "optimizer_arguments": {
         'lr': 1e-4
     },
-    "epochs": 10,
+    "epochs": 20,
     "epsilon": 8 / 255,
 
     "use_checkpoint": False,
     "checkpoint_file": 'checkpoint_01.data'
 }
 
-#CIFAR_CONFIG_RESNET20 = CIFAR_CONFIG
-#CIFAR_CONFIG_RESNET20["model_name"] = 'ResNet20'
+CIFAR_CONFIG_RESNET20 = dict(CIFAR_CONFIG)          # This now performs a deep copy
+CIFAR_CONFIG_RESNET20["model_name"] = 'ResNet20'
