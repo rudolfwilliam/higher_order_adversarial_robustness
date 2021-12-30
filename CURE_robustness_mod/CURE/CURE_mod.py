@@ -19,8 +19,8 @@ from torch.distributions import uniform
 
 
 class ModCURELearner():
-    def __init__(self, net, trainloader, testloader, device='cpu', lambda_0_ = 4, 
-                 lambda_1_ = 4, lambda_2_ = 4, path='./checkpoint'):
+    def __init__(self, net, trainloader, testloader, device='cpu', lambda_0_=4,
+                 lambda_1_=4, lambda_2_=4, path='./checkpoint'):
         '''
         CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
                     in https://arxiv.org/abs/1811.09716
@@ -45,7 +45,7 @@ class ModCURELearner():
         self.criterion = nn.CrossEntropyLoss()
         self.device = device
         self.lambda_0_ = lambda_0_
-        self.lambda_1_ = lambda_1_ 
+        self.lambda_1_ = lambda_1_
         self.lambda_2_ = lambda_2_
         self.trainloader, self.testloader = trainloader, testloader
         self.path = path
@@ -128,7 +128,7 @@ class ModCURELearner():
             outcome = predicted.data == targets
             num_correct += outcome.sum().item()
 
-            progress_bar(batch_idx, len(self.trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d) | curvature: %.3f ' % \
+            progress_bar(batch_idx, len(self.trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d) | curvature: %.3f ' %
                          (train_loss / (batch_idx + 1), 100. * num_correct / total, num_correct, total,
                           curvature / (batch_idx + 1)))
 
@@ -166,7 +166,7 @@ class ModCURELearner():
             test_loss += cur.item()
 
         print(
-            f'epoch = {epoch}, adv_acc = {100. * adv_acc / total}, clean_acc = {100. * clean_acc / total}, loss = {test_loss / (batch_idx + 1)}', \
+            f'epoch = {epoch}, adv_acc = {100. * adv_acc / total}, clean_acc = {100. * clean_acc / total}, loss = {test_loss / (batch_idx + 1)}',
             f'curvature = {curvature / (batch_idx + 1)}')
 
         self.test_loss.append(test_loss / (batch_idx + 1))
@@ -179,7 +179,7 @@ class ModCURELearner():
             self.save_model(self.path)
 
         return test_loss / (batch_idx + 1), 100. * adv_acc / total, 100. * clean_acc / total, curvature / (
-                    batch_idx + 1)
+            batch_idx + 1)
 
     def _find_z(self, inputs, targets, h):
         '''
@@ -199,12 +199,12 @@ class ModCURELearner():
         return z, norm_grad
 
     def elementwise_diff(self, low_ordr, inputs):
-        high_ordr = torch.autograd.grad(low_ordr, inputs, grad_outputs=torch.ones(low_ordr.size()).to(self.device), create_graph=True, retain_graph=True)[0].requires_grad_()
+        high_ordr = torch.autograd.grad(low_ordr, inputs, grad_outputs=torch.ones(low_ordr.size()).to(
+            self.device), create_graph=True, retain_graph=True)[0].requires_grad_()
         return high_ordr
 
     def regularizer(self, inputs, targets, h=3., lambda_=4):
         z, norm_grad = self._find_z(inputs, targets, h)
-
 
         inputs.requires_grad_()
         outputs_pos = self.net.eval()(inputs + z)
@@ -212,25 +212,27 @@ class ModCURELearner():
         loss_orig = self.criterion(outputs_orig, targets)
 
         # first order regularization
-        first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device), create_graph=True)[0].requires_grad_()
+        first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(
+            targets.size()).to(self.device), create_graph=True)[0].requires_grad_()
         reg_0 = torch.sum(torch.pow(first_order, 2) * self.lambda_0_)
         self.net.zero_grad()
 
         # second order regularization (original CURE)
         loss_pos = self.criterion(outputs_pos, targets)
         grad_diff = \
-        torch.autograd.grad((loss_pos - loss_orig), inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
-                            create_graph=True, allow_unused=True)[0]
+            torch.autograd.grad((loss_pos - loss_orig), inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
+                                create_graph=True, allow_unused=True)[0]
         pre = grad_diff.reshape(grad_diff.size(0), -1).norm(dim=1)
         reg_1 = torch.sum(pre * self.lambda_1_)
         self.net.zero_grad()
 
         # third order regularization
-        first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device), create_graph=True, retain_graph=True)[0].requires_grad_()
+        first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(
+            targets.size()).to(self.device), create_graph=True, retain_graph=True)[0].requires_grad_()
         scnd_order = self.elementwise_diff(first_order, inputs)
         third_order = self.elementwise_diff(scnd_order, inputs)
         # take sum of squared values of third order derivatives
-        reg_2 = torch.sum(torch.pow(third_order, 2) * self.lambda_2_) 
+        reg_2 = torch.sum(torch.pow(third_order, 2) * self.lambda_2_)
         self.net.zero_grad()
 
         return (reg_0 + reg_1 + reg_2) / float(inputs.size(0)), norm_grad
@@ -323,11 +325,3 @@ class ModCURELearner():
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
-
-
-
-
-
-
-
-

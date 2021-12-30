@@ -13,7 +13,7 @@ CIFAR_CONFIG = {
 
     # Getter functions
     "dataset": 'CIFAR10',
-    "model_name": 'VGG',  # SimpleModel or ResNet18
+    "model_name": 'ResNet20',  # Must be one of: [SimpleModel, VGG, ResNet18, ResNet20]
 
     # CURE configurations
     "lambda_": 4,

@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 import torchvision
-from torchvision.transforms import ToTensor, Normalize
+from torchvision.transforms import ToTensor, Normalize, ToPILImage
 
 
 class DataGetter():
@@ -33,9 +33,11 @@ class DataGetter():
         """
         if self.name == 'CIFAR10':
             return torchvision.transforms.Compose([
-                ToTensor(),
-                Normalize((0.,), (1/0.3081,)),  # Std of CIFAR10 /255 = 0.3081
-                Normalize((-0.2516,), (1.,))   # Mean of CIFAR10 /255 = 0.2516
+                Normalize((0, 0, 0),
+                          (1 / 0.2023, 1 / 0.1994, 1 / 0.2010)),
+                Normalize((-0.4914, -0.4822, -0.4465),
+                          (1, 1, 1)),
+                # ToPILImage(mode="RGB")
             ])
         if self.name == 'MNIST':
             return torchvision.transforms.Compose([
