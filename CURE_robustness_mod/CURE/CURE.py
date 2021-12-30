@@ -65,6 +65,7 @@ class CURELearner():
         self.image_max = image_max
         self.train_loss, self.train_acc = [], []
         self.test_loss, self.test_acc_adv, self.test_acc_clean = [], [], []
+        self.train_curv_total, self.test_curv_total = [], []
         self.train_curv_0, self.train_curv_1, self.train_curv_2, self.train_curv_3 = [], [], [], []
         self.test_curv_0, self.test_curv_1, self.test_curv_2, self.test_curv_3 = [], [], [], []
 
@@ -167,7 +168,7 @@ class CURELearner():
 
         self.train_loss.append(train_loss/(batch_idx+1))
         self.train_acc.append(100.*num_correct/total)
-        self.train_curv.append(curvature/(batch_idx+1))
+        self.train_curv_total.append(curvature/(batch_idx+1))
         self.train_curv_0.append(curvature_0 / (batch_idx + 1))
         self.train_curv_1.append(curvature_1 / (batch_idx + 1))
         self.train_curv_2.append(curvature_2 / (batch_idx + 1))
@@ -218,7 +219,7 @@ class CURELearner():
         self.test_loss.append(test_loss/(batch_idx+1))
         self.test_acc_adv.append(100.*adv_acc/total)
         self.test_acc_clean.append(100.*clean_acc/total)
-        self.test_curv.append(curvature/(batch_idx+1))
+        self.test_curv_total.append(curvature/(batch_idx+1))
         self.test_curv_0.append(curvature_0 / (batch_idx + 1))
         self.test_curv_1.append(curvature_1 / (batch_idx + 1))
         self.test_curv_2.append(curvature_2 / (batch_idx + 1))
@@ -312,7 +313,7 @@ class CURELearner():
 
         # first order finite difference regularizer
 
-        return (reg_0 + reg_1 + reg_2 + reg_3) / float(inputs.size(0)), norm_grad, [reg_0, reg_1, reg_2, reg_3]
+        return (reg_0 + reg_1 + reg_2 + reg_3) / float(inputs.size(0)), norm_grad, [reg_0 / float(inputs.size(0)), reg_1 / float(inputs.size(0)), reg_2 / float(inputs.size(0)), reg_3 / float(inputs.size(0))]
 
     def save_model(self, path):
         '''
@@ -341,8 +342,8 @@ class CURELearner():
             'train_acc': self.train_acc,
             'test_acc_clean': self.test_acc_clean,
             'test_acc_adv': self.test_acc_adv,
-            'train_curv': self.train_curv,
-            'test_curv': self.test_curv,
+            'train_curv_total': self.train_curv_total,
+            'test_curv_total': self.test_curv_total,
             'train_curv_0': self.train_curv_0,
             'train_curv_1': self.train_curv_1,
             'train_curv_2': self.train_curv_2,
@@ -369,8 +370,8 @@ class CURELearner():
         self.train_acc = checkpoint['train_acc']
         self.test_acc_clean = checkpoint['test_acc_clean']
         self.test_acc_adv = checkpoint['test_acc_adv']
-        self.train_curv = checkpoint['train_curv']
-        self.test_curv = checkpoint['test_curv']
+        self.train_curv_total = checkpoint['train_curv_total']
+        self.test_curv_total = checkpoint['test_curv_total']
         self.train_curv_0 = checkpoint['train_curv_0'],
         self.train_curv_1 = checkpoint['train_curv_1'],
         self.train_curv_2 = checkpoint['train_curv_2'],
@@ -402,6 +403,7 @@ class CURELearner():
         plt.plot(self.train_curv_1, Linewidth=2, c='C1')
         plt.plot(self.train_curv_2, Linewidth=2, c='C2')
         plt.plot(self.train_curv_3, Linewidth=2, c='C3')
+        plt.plot(self.train_curv_total, Linewidth=4, c='black')
         plt.legend(['train_curv_0', 'train_curv_1', 'train_curv_2', 'train_curv_3'], fontsize=14)
         plt.title('Train Curvatures', fontsize=14)
         plt.ylabel('curv', fontsize=14)
@@ -414,6 +416,7 @@ class CURELearner():
         plt.plot(self.test_curv_1, Linewidth=2, c='C1')
         plt.plot(self.test_curv_2, Linewidth=2, c='C2')
         plt.plot(self.test_curv_3, Linewidth=2, c='C3')
+        plt.plot(self.test_curv_total, Linewidth=4, c='black')
         plt.legend(['test_curv_0', 'test_curv_1', 'test_curv_2', 'test_curv_3'], fontsize=14)
         plt.title('Test Curvatures', fontsize=14)
         plt.ylabel('curv', fontsize=14)
