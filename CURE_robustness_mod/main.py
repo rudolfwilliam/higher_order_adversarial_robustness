@@ -36,7 +36,7 @@ def train_CURE(config, plot_results=True, trial=None):
 
     # Train the net-cure model
     if config["use_checkpoint"]:
-        net_CURE.import_state(config["checkpoint_file"])
+        net_CURE.import_state(checkpoint_path / config["checkpoint_file"])
 
     else:
         net_CURE.train(epochs=config["epochs"], h=config["h"], epsilon=config["epsilon"])
