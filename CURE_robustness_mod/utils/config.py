@@ -12,13 +12,13 @@ CIFAR_CONFIG = {
 
 
     # Getter functions
-    "dataset": 'CIFAR10',
+    "dataset": 'MNIST',
     "model_name": 'SimpleModel',  # SimpleModel or ResNet18
 
     # CURE configurations
-    "lambda_0": 4,
-    "lambda_1": 8,
-    "lambda_2": 8,
+    "lambda_0": 0,
+    "lambda_1": 4,
+    "lambda_2": 0,
     "mu_1": 0,
     "mu_2": 0,
     "mu_3": 0,

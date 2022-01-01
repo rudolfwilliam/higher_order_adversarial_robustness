@@ -19,7 +19,7 @@ from torch.distributions import uniform
 
 
 class HighAcc_CURELearner():
-    def __init__(self, net, trainloader, testloader, device='cpu', path='./checkpoint'):
+    def __init__(self, net, trainloader, lambda_, testloader, device='cpu', path='./checkpoint'):
         '''
         CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
                     in https://arxiv.org/abs/1811.09716
@@ -45,6 +45,7 @@ class HighAcc_CURELearner():
         self.device = device
         self.trainloader, self.testloader = trainloader, testloader
         self.path = path
+        self.lambda_ = lambda_
         self.test_acc_adv_best = 0
         self.train_loss, self.train_acc, self.train_curv = [], [], []
         self.test_loss, self.test_acc_adv, self.test_acc_clean, self.test_curv = [], [], [], []
@@ -110,7 +111,7 @@ class HighAcc_CURELearner():
             total += targets.size(0)
             outputs = self.net.train()(inputs)
 
-            regularizer, grad_norm = self.regularizer(inputs, targets, h=h)
+            regularizer, _ = self.regularizer(inputs, targets, lambda_=self.lambda_, h=h)
 
             curvature += regularizer.item()
             neg_log_likelihood = self.criterion(outputs, targets)
@@ -156,7 +157,7 @@ class HighAcc_CURELearner():
             outputs = self.net(inputs_pert)
             probs, predicted = outputs.max(1)
             adv_acc += predicted.eq(targets).sum().item()
-            cur, norm_grad = self.regularizer(inputs, targets, h=h)
+            cur, norm_grad = self.regularizer(inputs, targets, lambda_=self.lambda_, h=h)
             grad_sum += norm_grad
             curvature += cur.item()
             test_loss += cur.item()
