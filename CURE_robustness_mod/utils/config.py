@@ -12,8 +12,8 @@ CIFAR_CONFIG = {
 
 
     # Getter functions
-    "dataset": 'MNIST',
-    "model_name": 'SimpleModel',  # SimpleModel or ResNet18
+    "dataset": 'CIFAR10',
+    "model_name": 'ResNet18',  # SimpleModel or ResNet18
 
     # CURE configurations
     "lambda_0": 0,
@@ -27,7 +27,7 @@ CIFAR_CONFIG = {
     "optimizer_arguments": {
         'lr': 1e-4
     },
-    "epochs": 10,
+    "epochs": 20,
     "epsilon": 8 / 255,
 
     "use_checkpoint": False,
