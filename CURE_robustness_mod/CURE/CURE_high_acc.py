@@ -239,6 +239,7 @@ class HighAcc_CURELearner():
     def regularizer(self, inputs, targets, h=3.):
         z, norm_grad = self._find_z(inputs, targets, h)
 
+        """
         inputs.requires_grad_()
         outputs_orig = self.net.eval()(inputs)
         loss_orig = self.criterion(outputs_orig, targets)
@@ -250,51 +251,23 @@ class HighAcc_CURELearner():
         # TODO: lambda -> lambda_0
         reg_0 = torch.sum(torch.pow(first_order, 2) * self.lambda_0)
         self.net.zero_grad()
-
+        """
 
         # CURE regularization with higher order accuracy O(h^4) instead of O(h^2)
         # using central finite difference. These coefficients are fixed constants (see https://en.wikipedia.org/wiki/Finite_difference_coefficient)
-        coeffs = torch.tensor([1/12, -2/3, 2/3, -1/12], requires_grad=False)
+        coeffs = torch.tensor([1/12, -2/3, 2/3, -1/12], requires_grad=False).to(self.device)
         # evaluation points
-        evals = [self.net.eval()(), self.net.eval()(inputs + -h*z), self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z)]
+        evals = [self.net.eval()(inputs-2*h*z), self.net.eval()(inputs -h*z), self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z)]
         losses = torch.stack([self.criterion(ev, targets) for ev in evals])
         lin_comb = torch.sum(coeffs * losses)
         approx = \
-        torch.autograd.grad(lin_comb, create_graph=True, allow_unused=True)[0]
+        torch.autograd.grad(lin_comb, inputs, create_graph=True)[0]   #Klaus suggests: allow_unused=True
         pre = approx.reshape(approx.size(0), -1).norm(dim=1)
         reg_1 = torch.sum(pre * self.lambda_1)
         self.net.zero_grad()
 
-        # third order regularization
 
-        loss_1 = self.criterion(self.net.eval()(inputs - h*torch.ones_like(inputs)), targets)
-        loss_2 = self.criterion(self.net.eval()(inputs), targets)
-        loss_3 = self.criterion(self.net.eval()(inputs + h*torch.ones_like(inputs)), targets)
-        """
-        loss_1 = self.criterion(self.net.eval()(inputs - h*z), targets)
-        loss_2 = self.criterion(self.net.eval()(inputs), targets)
-        loss_3 = self.criterion(self.net.eval()(inputs + h*z), targets)
-        """
-
-
-        total_fin_dif = self._3_diff(loss_1,loss_2,loss_3,h)
-
-        #third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
-        #                                create_graph=True)[0]
-        third_order_approx = torch.autograd.grad(total_fin_dif, inputs, create_graph=True)[0]
-        #third_order_approx = total_fin_dif
-        reg_2 = torch.sum(torch.pow(third_order_approx, 2) * self.lambda_2)
-        self.net.zero_grad()
-
-        # first order finite difference regularizer
-
-        # first order finite difference regularizer
-        third_order_approx = total_fin_dif
-        reg_3 = torch.sum(torch.pow(third_order_approx, 2) * self.mu_2)
-
-        # first order finite difference regularizer
-
-        return (reg_0 + reg_1 + reg_2 + reg_3) / float(inputs.size(0)), norm_grad
+        return reg / float(inputs.size(0)), norm_grad
 
     def save_model(self, path):
         '''
@@ -384,6 +357,3 @@ class HighAcc_CURELearner():
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
-
-
-
