@@ -11,20 +11,20 @@ CIFAR_CONFIG = {
 
     # Getter functions
     "dataset": 'CIFAR10',
-    "model_name": 'ResNet18',  # SimpleModel or ResNet18
+    "model_name": 'ResNet18',  # SimpleModel or AlexNet or VGG or ResNet18
 
     # CURE configurations
-    "accuracy": 1,
-    "lambda_0": 0,
-    "lambda_1": 4,
-    "lambda_2": 1,
-    "h": [0.1, 0.5, 0.9, 1.3, 1.5],
+    "accuracy": 1, # Can be 1, 2, 4, 6, 8
+    "lambda_0": 0, # Gradient regularizer
+    "lambda_1": 4, # Original CURE
+    "lambda_2": 0, # Third order regularizer
+    "h": [0.1, 0.5, 0.9, 1.3, 1.5], # Length determines minimum nr of epochs
     "optimization_algorithm": 'Adam',
     "optimizer_arguments": {
         'lr': 1e-4
     },
     "epochs": 10,
-    "epsilon": 2 / 255,
+    "epsilon": 4 / 255,
 
     "use_checkpoint": False,
     "checkpoint_file": 'checkpoint_01.data'

@@ -257,11 +257,11 @@ class CURELearner():
         z, norm_grad = self._find_z(inputs, targets)
 
         inputs.requires_grad_()
+        outputs_orig = self.net.eval()(inputs)
+        loss_orig = self.criterion(outputs_orig, targets)
 
         reg_0 = torch.Tensor([0]).to(self.device)
         if self.lambda_0 != 0:
-            outputs_orig = self.net.eval()(inputs)
-            loss_orig = self.criterion(outputs_orig, targets)
             # first order regularization
             # first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
             #                                create_graph=True)[0].requires_grad_()
@@ -271,8 +271,6 @@ class CURELearner():
 
         reg_1 = torch.tensor([0]).to(self.device)
         if acc==1:
-            outputs_orig = self.net.eval()(inputs)
-            loss_orig = self.criterion(outputs_orig, targets)
             outputs_pos = self.net.eval()(inputs + h*z)
             loss_pos = self.criterion(outputs_pos, targets)
             approx = torch.autograd.grad((loss_pos-loss_orig), inputs, create_graph=True)[0]
@@ -299,7 +297,7 @@ class CURELearner():
                              self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z), self.net.eval()(inputs + 3*h*z)]
                 elif acc==8:
                     # CURE regularization with higher order accuracy O(h^8) instead of O(h^2)
-                    coeffs = torch.tensor([-1/560, 8/315, -1/5, 8/5, -205/72, 8/5, -1/5, 8/315,-1/560], requires_grad=False).to(self.device)
+                    coeffs = torch.tensor([1/280,-4/105,1/5,-4/5,4/5,-1/5,4/105,-1/280], requires_grad=False).to(self.device)
                     # evaluation points
                     evals = [self.net.eval()(inputs - 4*h*z), self.net.eval()(inputs - 3*h*z), self.net.eval()(inputs - 2*h*z),
                              self.net.eval()(inputs - h*z), self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z),
