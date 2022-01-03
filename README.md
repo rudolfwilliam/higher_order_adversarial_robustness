@@ -8,6 +8,6 @@ The base for our code is https://github.com/F-Salehi/CURE_robustness. However, w
 
 To run our code, run `DL_project/CURE_robustness_mod/main.py`. You can set hyper parameters for e.g. regularizer constants, data set and level of estimation accuracy in `CURE_robustness_mod/utils/config.py`.
 
-We recommend you to create a conda or virtual environment from our `CURE_robustness_mod/requirements.txt` with PyTorch version `3.7.1`. 
+We recommend you to create a conda or virtual environment from our `CURE_robustness_mod/requirements.txt` with PyTorch version `3.7.1`. The code might still run if you do it differently, but no guarantees. :no_good:
 
-If you still have any questions, feel free to reach out to us. Otherwise, enjoy our code!
+If you still have any questions, feel free to reach out to us. Otherwise, enjoy our code! :raised_hands:
