@@ -146,8 +146,8 @@ class CURELearner():
             regularizer, grad_norm = self.regularizer(inputs, targets, h=h, acc=self.acc)
 
             curvature += regularizer.item()
-            neg_log_likelihood = self.criterion(outputs, targets)
-            loss = neg_log_likelihood + regularizer
+            loss = self.criterion(outputs, targets)
+            loss = loss + regularizer
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -269,10 +269,10 @@ class CURELearner():
                     # evaluation points
                     evals = [self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z), self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z)]
                 else:
-                    # CURE regularization with higher order accuracy O(h^6) instead of O(h^2) 
+                    # CURE regularization with higher order accuracy O(h^6) instead of O(h^2)
                     coeffs = torch.tensor([-1/60, 3/20, -3/4, 3/4, -3/20, 1/60], requires_grad=False)
                     # evaluation points
-                    evals = [self.net.eval()(inputs - 3*h*z), self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z), 
+                    evals = [self.net.eval()(inputs - 3*h*z), self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z),
                              self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z), self.net.eval()(inputs + 3*h*z)]
                 losses = torch.stack([self.criterion(ev, targets) for ev in evals])
                 lin_comb = torch.sum(coeffs * losses)
@@ -302,15 +302,7 @@ class CURELearner():
         reg_2 = torch.sum(torch.pow(third_order_approx, 2) * self.lambda_2)
         self.net.zero_grad()
 
-        # first order finite difference regularizer
-
-        # first order finite difference regularizer
-        third_order_approx = total_fin_dif
-        reg_3 = torch.sum(torch.pow(third_order_approx, 2) * self.mu_2)
-
-        # first order finite difference regularizer
-
-        return (reg_0 + reg_1 + reg_2 + reg_3) / float(inputs.size(0)), norm_grad
+        return (reg_0 + reg_1 + reg_2 ) / float(inputs.size(0)), norm_grad
 
     def save_model(self, path):
         '''
