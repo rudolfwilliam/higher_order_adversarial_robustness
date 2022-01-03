@@ -21,7 +21,7 @@ from torchvision.transforms import ToTensor, Compose
 
 
 class CURELearner():
-    def __init__(self, net, trainloader, testloader,  lambda_0=4, lambda_1=4, lambda_2=0, mu_0=4, mu_1=0, mu_2=0, transformer=None, trial=None, image_min=0, image_max=1, device='cuda',
+    def __init__(self, net, trainloader, testloader,  lambda_0=4, lambda_1=4, lambda_2=0, transformer=None, trial=None, image_min=0, image_max=1, device='cuda',
                  path='./checkpoint', acc=0):
         '''
         CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
@@ -57,9 +57,6 @@ class CURELearner():
         self.lambda_0 = lambda_0
         self.lambda_1 = lambda_1
         self.lambda_2 = lambda_2
-        self.mu_0 = mu_0
-        self.mu_1 = mu_1
-        self.mu_2 = mu_2
         self.trainloader, self.testloader = trainloader, testloader
         self.path = path
         self.test_acc_adv_best = 0
@@ -69,8 +66,8 @@ class CURELearner():
         self.train_loss, self.train_acc = [], []
         self.test_loss, self.test_acc_adv, self.test_acc_clean = [], [], []
         self.train_curv_total, self.test_curv_total = [], []
-        self.train_curv_0, self.train_curv_1, self.train_curv_2, self.train_curv_3 = [], [], [], []
-        self.test_curv_0, self.test_curv_1, self.test_curv_2, self.test_curv_3 = [], [], [], []
+        self.train_curv_0, self.train_curv_1, self.train_curv_2 = [], [], []
+        self.test_curv_0, self.test_curv_1, self.test_curv_2 = [], [], []
 
 
     def set_optimizer(self, optim_alg='Adam', args={'lr': 1e-4}, scheduler=None, args_scheduler={}):
@@ -92,7 +89,7 @@ class CURELearner():
             self.net.parameters(), **args)
         if not scheduler:
             self.scheduler = optim.lr_scheduler.StepLR(
-                self.optimizer, step_size=10**6, gamma=1)
+                self.optimizer, step_size=7, gamma=0.1)
         else:
             self.scheduler = getattr(optim.lr_scheduler, scheduler)(
                 self.optimizer, **args_scheduler)
@@ -141,7 +138,7 @@ class CURELearner():
         train_loss, total = 0, 0
         num_correct = 0
         curv, curvature, norm_grad_sum = 0, 0, 0
-        curvature_0, curvature_1, curvature_2, curvature_3 = 0, 0, 0, 0
+        curvature_0, curvature_1, curvature_2 = 0, 0, 0
 
         for batch_idx, (inputs, targets) in enumerate(self.trainloader):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
@@ -149,15 +146,14 @@ class CURELearner():
             total += targets.size(0)
             outputs = self.net.train()(inputs)
 
-            regularizer, grad_norm, curvatures_split_up = self.regularizer(inputs, targets, h=h, acc=self.acc)
+            regularizer, grad_norm, curvatures_split_up = self.regularizer(inputs, targets, h=h)
 
             curvature += regularizer.item()
             curvature_0 += curvatures_split_up[0].item()
             curvature_1 += curvatures_split_up[1].item()
             curvature_2 += curvatures_split_up[2].item()
-            curvature_3 += curvatures_split_up[3].item()
-            neg_log_likelihood = self.criterion(outputs, targets)
-            loss = neg_log_likelihood + regularizer
+            loss = self.criterion(outputs, targets)
+            loss = loss + regularizer
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -176,14 +172,13 @@ class CURELearner():
         self.train_curv_0.append(curvature_0 / (batch_idx + 1))
         self.train_curv_1.append(curvature_1 / (batch_idx + 1))
         self.train_curv_2.append(curvature_2 / (batch_idx + 1))
-        self.train_curv_3.append(curvature_3 / (batch_idx + 1))
 
     def test(self, epoch, h, num_pgd_steps=20, eps=8/255):
         '''
         Testing the model
         '''
         test_loss, adv_acc, total, curvature, clean_acc, grad_sum = 0, 0, 0, 0, 0, 0
-        curvature_0, curvature_1, curvature_2, curvature_3 = 0, 0, 0, 0
+        curvature_0, curvature_1, curvature_2 = 0, 0, 0
 
         for batch_idx, (inputs, targets) in enumerate(self.testloader):
 
@@ -214,7 +209,6 @@ class CURELearner():
             curvature_0 += curvatures_split_up[0].item()
             curvature_1 += curvatures_split_up[1].item()
             curvature_2 += curvatures_split_up[2].item()
-            curvature_3 += curvatures_split_up[3].item()
             test_loss += cur.item()
 
         print(f'epoch = {epoch}, adv_acc = {100.*adv_acc/total}, clean_acc = {100.*clean_acc/total}, loss = {test_loss/(batch_idx+1)}',
@@ -227,7 +221,6 @@ class CURELearner():
         self.test_curv_0.append(curvature_0 / (batch_idx + 1))
         self.test_curv_1.append(curvature_1 / (batch_idx + 1))
         self.test_curv_2.append(curvature_2 / (batch_idx + 1))
-        self.test_curv_3.append(curvature_3 / (batch_idx + 1))
         if self.test_acc_adv[-1] > self.test_acc_adv_best:
             self.test_acc_adv_best = self.test_acc_adv[-1]
             print(f'Saving the best model to {self.path}')
@@ -235,7 +228,7 @@ class CURELearner():
 
         return test_loss/(batch_idx+1), 100.*adv_acc/total, 100.*clean_acc/total, curvature/(batch_idx+1)
 
-    def _find_z(self, inputs, targets, h):
+    def _find_z(self, inputs, targets):
         '''
         Finding the direction in the regularizer
         '''
@@ -247,7 +240,7 @@ class CURELearner():
         grad = inputs.grad.data + 0.0
         norm_grad = grad.norm().item()
         z = torch.sign(grad).detach() + 0.
-        z = 1.*(h) * (z+1e-7) / (z.reshape(z.size(0), -
+        z = 1. * (z+1e-7) / (z.reshape(z.size(0), -
                                            1).norm(dim=1)[:, None, None, None]+1e-7)
         # zero_gradients(inputs)
         inputs.grad.detach_()
@@ -256,83 +249,84 @@ class CURELearner():
 
         return z, norm_grad
 
-    def _finite_dif(self, in_0, in_1, infin):
-        return (in_0 - in_1) / infin
+    def _3_diff(self, in_0, in_1, in_2):
+        return in_0-2*in_1+in_2
 
-    def _3_diff(self, in_0, in_1, in_2, infin):
-        return (in_0-2*in_1+in_2)/infin
-
-    def regularizer(self, inputs, targets, h=3., acc=0):
-        z, norm_grad = self._find_z(inputs, targets, h)
+    def regularizer(self, inputs, targets, h=3.):
+        acc = self.acc
+        z, norm_grad = self._find_z(inputs, targets)
 
         inputs.requires_grad_()
         outputs_orig = self.net.eval()(inputs)
         loss_orig = self.criterion(outputs_orig, targets)
 
-        # first order regularization
-        # first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
-        #                                create_graph=True)[0].requires_grad_()
-        first_order = torch.autograd.grad(loss_orig, inputs, create_graph=True)[0].requires_grad_()
-        # TODO: lambda -> lambda_0
-        reg_0 = torch.sum(torch.pow(first_order, 2) * self.lambda_0)
-        self.net.zero_grad()
+        reg_0 = torch.Tensor([0]).to(self.device)
+        if self.lambda_0 != 0:
+            # first order regularization
+            # first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
+            #                                create_graph=True)[0].requires_grad_()
+            first_order = torch.autograd.grad(loss_orig, inputs, create_graph=True)[0].requires_grad_()
+            reg_0 = torch.sum(torch.pow(first_order, 2) * self.lambda_0)
+            self.net.zero_grad()
 
-        if acc == 0:
-                # vanilla CURE regularizer
-                # second order regularization
-                outputs_pos = self.net.eval()(inputs + z)
-                loss_pos = self.criterion(outputs_pos, targets)
-                grad_diff = torch.autograd.grad((loss_pos-loss_orig), inputs, create_graph=True)[0]
-                pre = grad_diff.reshape(grad_diff.size(0), -1).norm(dim=1)
-        elif acc == 1 or acc == 2:
-                if acc == 1:
+        reg_1 = torch.tensor([0]).to(self.device)
+        if acc==1:
+            outputs_pos = self.net.eval()(inputs + h*z)
+            loss_pos = self.criterion(outputs_pos, targets)
+            approx = torch.autograd.grad((loss_pos-loss_orig), inputs, create_graph=True)[0]
+            pre = approx.reshape(approx.size(0), -1).norm(dim=1)
+            reg_1 = torch.sum(pre * self.lambda_1)
+
+        if acc in [2,4,6,8]:
+                if acc == 2:
                     # CURE regularization with higher order accuracy O(h^4) instead of O(h^2)
                     # using central finite difference. These coefficients are fixed constants (see https://en.wikipedia.org/wiki/Finite_difference_coefficient)
-                    coeffs = torch.tensor([1/12, -2/3, 2/3, -1/12], requires_grad=False)
+                    coeffs = torch.tensor([-1/2, +1/2], requires_grad=False).to(self.device)
+                    # evaluation points
+                    evals = [self.net.eval()(inputs - h*z), self.net.eval()(inputs + h*z)]
+                elif acc == 4:
+                    # CURE regularization with higher order accuracy O(h^6) instead of O(h^2)
+                    coeffs = torch.tensor([1/12, -2/3, 2/3, -1/12], requires_grad=False).to(self.device)
                     # evaluation points
                     evals = [self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z), self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z)]
-                else:
-                    # CURE regularization with higher order accuracy O(h^6) instead of O(h^2) 
-                    coeffs = torch.tensor([-1/60, 3/20, -3/4, 3/4, -3/20, 1/60], requires_grad=False)
+                elif acc==6:
+                    # CURE regularization with higher order accuracy O(h^6) instead of O(h^2)
+                    coeffs = torch.tensor([-1/60, 3/20, -3/4, 3/4, -3/20, 1/60], requires_grad=False).to(self.device)
                     # evaluation points
-                    evals = [self.net.eval()(inputs - 3*h*z), self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z), 
+                    evals = [self.net.eval()(inputs - 3*h*z), self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z),
                              self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z), self.net.eval()(inputs + 3*h*z)]
+                elif acc==8:
+                    # CURE regularization with higher order accuracy O(h^8) instead of O(h^2)
+                    coeffs = torch.tensor([1/280,-4/105,1/5,-4/5,4/5,-1/5,4/105,-1/280], requires_grad=False).to(self.device)
+                    # evaluation points
+                    evals = [self.net.eval()(inputs - 4*h*z), self.net.eval()(inputs - 3*h*z), self.net.eval()(inputs - 2*h*z),
+                             self.net.eval()(inputs - h*z), self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z),
+                             self.net.eval()(inputs + 3*h*z), self.net.eval()(inputs + 4*h*z)]
+
                 losses = torch.stack([self.criterion(ev, targets) for ev in evals])
                 lin_comb = torch.sum(coeffs * losses)
-                approx = torch.autograd.grad(lin_comb, inputs, create_graph=True)[0]
+                approx = torch.autograd.grad((lin_comb), inputs, create_graph=True)[0]
                 pre = approx.reshape(approx.size(0), -1).norm(dim=1)
-        reg_1 = torch.sum(pre * self.lambda_1)
+                reg_1 = torch.sum(pre * self.lambda_1)
         self.net.zero_grad()
 
         # third order regularization
+        reg_2 = torch.Tensor([0]).to(self.device)
+        if self.lambda_2 != 0:
+            loss_1 = self.criterion(self.net.eval()(inputs - h*torch.ones_like(inputs)), targets)
+            loss_2 = self.criterion(self.net.eval()(inputs), targets)
+            loss_3 = self.criterion(self.net.eval()(inputs + h*torch.ones_like(inputs)), targets)
 
-        loss_1 = self.criterion(self.net.eval()(inputs - h*torch.ones_like(inputs)), targets)
-        loss_2 = self.criterion(self.net.eval()(inputs), targets)
-        loss_3 = self.criterion(self.net.eval()(inputs + h*torch.ones_like(inputs)), targets)
-        """
-        loss_1 = self.criterion(self.net.eval()(inputs - h*z), targets)
-        loss_2 = self.criterion(self.net.eval()(inputs), targets)
-        loss_3 = self.criterion(self.net.eval()(inputs + h*z), targets)
-        """
+            total_fin_dif = self._3_diff(loss_1, loss_2, loss_3)
 
-        total_fin_dif = self._3_diff(loss_1, loss_2, loss_3, h)
+            # third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
+            #                                create_graph=True)[0]
+            third_order_approx = torch.autograd.grad(total_fin_dif, inputs, create_graph=True)[0]
+            #third_order_approx = total_fin_dif
+            reg_2 = torch.sum(torch.pow(third_order_approx, 2) * self.lambda_2)
+            self.net.zero_grad()
 
-        # third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
-        #                                create_graph=True)[0]
-        third_order_approx = torch.autograd.grad(total_fin_dif, inputs, create_graph=True)[0]
-        #third_order_approx = total_fin_dif
-        reg_2 = torch.sum(torch.pow(third_order_approx, 2) * self.lambda_2)
-        self.net.zero_grad()
-
-        # first order finite difference regularizer
-
-        # first order finite difference regularizer
-        third_order_approx = total_fin_dif
-        reg_3 = torch.sum(torch.pow(third_order_approx, 2) * self.mu_2)
-
-        # first order finite difference regularizer
-
-        return (reg_0 + reg_1 + reg_2 + reg_3) / float(inputs.size(0)), norm_grad, [reg_0 / float(inputs.size(0)), reg_1 / float(inputs.size(0)), reg_2 / float(inputs.size(0)), reg_3 / float(inputs.size(0))]
+        return (reg_0 + reg_1 + reg_2) / float(inputs.size(0)), norm_grad, [reg_0 / float(inputs.size(0)), reg_1 / float(inputs.size(0)), reg_2 / float(inputs.size(0))]
 
     def save_model(self, path):
         '''
@@ -366,11 +360,9 @@ class CURELearner():
             'train_curv_0': self.train_curv_0,
             'train_curv_1': self.train_curv_1,
             'train_curv_2': self.train_curv_2,
-            'train_curv_3': self.train_curv_3,
             'test_curv_0': self.test_curv_0,
             'test_curv_1': self.test_curv_1,
             'test_curv_2': self.test_curv_2,
-            'test_curv_3': self.test_curv_3,
             'train_loss': self.train_loss,
             'test_loss': self.test_loss
         }
@@ -394,11 +386,9 @@ class CURELearner():
         self.train_curv_0 = checkpoint['train_curv_0']
         self.train_curv_1 = checkpoint['train_curv_1']
         self.train_curv_2 = checkpoint['train_curv_2']
-        self.train_curv_3 = checkpoint['train_curv_3']
         self.test_curv_0 = checkpoint['test_curv_0']
         self.test_curv_1 = checkpoint['test_curv_1']
         self.test_curv_2 = checkpoint['test_curv_2']
-        self.test_curv_3 = checkpoint['test_curv_3']
         self.train_loss = checkpoint['train_loss']
         self.test_loss = checkpoint['test_loss']
 
@@ -422,7 +412,6 @@ class CURELearner():
         plt.plot(self.train_curv_0, Linewidth=2, c='C0', label='train_curv_0')
         plt.plot(self.train_curv_1, Linewidth=2, c='C1', label='train_curv_1')
         plt.plot(self.train_curv_2, Linewidth=2, c='C2', label='train_curv_2')
-        #plt.plot(self.train_curv_3, Linewidth=2, c='C3')
         plt.legend(fontsize=14)
 
         plt.title('Train Curvatures', fontsize=14)
@@ -436,7 +425,6 @@ class CURELearner():
         plt.plot(self.test_curv_0, Linewidth=2, c='C0', label='test_curv_0')
         plt.plot(self.test_curv_1, Linewidth=2, c='C1', label='test_curv_1')
         plt.plot(self.test_curv_2, Linewidth=2, c='C2', label='test_curv_2')
-        #plt.plot(self.test_curv_3, Linewidth=2, c='C3')
         plt.legend(fontsize=14)
         plt.title('Test Curvatures', fontsize=14)
         plt.ylabel('curv', fontsize=14)
