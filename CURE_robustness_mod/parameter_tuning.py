@@ -13,8 +13,8 @@ def objective_CURE(trial):
     config = dict(CIFAR_CONFIG)
     config["dataset"] = 'CIFAR10'
     config["model_name"] = 'ResNet18'
-    config['batch_size_test'] = 500
-    config["accuracy"] = 2
+    config['batch_size_test'] = 200
+    config["accuracy"] = 1
     config["epsilon"] = 8 / 255
     config["epochs"] = 20
     config["lambda_0"] = 0
@@ -39,8 +39,8 @@ def objective_find_best_lambdas(trial):
     config = dict(CIFAR_CONFIG)
     config["dataset"] = 'CIFAR10'
     config["model_name"] = 'ResNet18'
-    config['batch_size_test'] = 500
-    config["accuracy"] = 2
+    config['batch_size_test'] = 200
+    config["accuracy"] = 1
     config["epsilon"] = 8 / 255
     config["epochs"] = 20
 
