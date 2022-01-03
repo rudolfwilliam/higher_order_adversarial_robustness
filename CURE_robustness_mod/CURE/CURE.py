@@ -22,7 +22,7 @@ from torchvision.transforms import ToTensor, Compose
 
 class CURELearner():
     def __init__(self, net, trainloader, testloader,  lambda_0=4, lambda_1=4, lambda_2=0, mu_0=4, mu_1=0, mu_2=0, transformer=None, trial=None, image_min=0, image_max=1, device='cuda',
-                 path='./checkpoint'):
+                 path='./checkpoint', acc=0):
         '''
         CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
                     in https://arxiv.org/abs/1811.09716
@@ -39,6 +39,8 @@ class CURELearner():
             power of regularization
         path: string
             path to save the best model
+        acc: element of [0, 1, 2]
+            level of accuracy for the computation of the Hessian vector product
         '''
         if not torch.cuda.is_available() and device == 'cuda':
             raise ValueError("cuda is not available")
@@ -63,11 +65,13 @@ class CURELearner():
         self.test_acc_adv_best = 0
         self.image_min = image_min
         self.image_max = image_max
+        self.acc = acc
         self.train_loss, self.train_acc = [], []
         self.test_loss, self.test_acc_adv, self.test_acc_clean = [], [], []
         self.train_curv_total, self.test_curv_total = [], []
         self.train_curv_0, self.train_curv_1, self.train_curv_2, self.train_curv_3 = [], [], [], []
         self.test_curv_0, self.test_curv_1, self.test_curv_2, self.test_curv_3 = [], [], [], []
+
 
     def set_optimizer(self, optim_alg='Adam', args={'lr': 1e-4}, scheduler=None, args_scheduler={}):
         '''
@@ -145,7 +149,7 @@ class CURELearner():
             total += targets.size(0)
             outputs = self.net.train()(inputs)
 
-            regularizer, grad_norm, curvatures_split_up = self.regularizer(inputs, targets, h=h)
+            regularizer, grad_norm, curvatures_split_up = self.regularizer(inputs, targets, h=h, acc=self.acc)
 
             curvature += regularizer.item()
             curvature_0 += curvatures_split_up[0].item()
@@ -258,7 +262,7 @@ class CURELearner():
     def _3_diff(self, in_0, in_1, in_2, infin):
         return (in_0-2*in_1+in_2)/infin
 
-    def regularizer(self, inputs, targets, h=3.):
+    def regularizer(self, inputs, targets, h=3., acc=0):
         z, norm_grad = self._find_z(inputs, targets, h)
 
         inputs.requires_grad_()
@@ -273,16 +277,31 @@ class CURELearner():
         reg_0 = torch.sum(torch.pow(first_order, 2) * self.lambda_0)
         self.net.zero_grad()
 
-        # second order regularization
-        outputs_pos = self.net.eval()(inputs + z)
-        loss_pos = self.criterion(outputs_pos, targets)
-
-        # grad_diff = torch.autograd.grad((loss_pos-loss_orig), inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
-        #                                create_graph=True)[0]
-        grad_diff = torch.autograd.grad(
-            (loss_pos-loss_orig), inputs, create_graph=True)[0]
-        pre = grad_diff.reshape(grad_diff.size(0), -1).norm(dim=1)
-        reg_1 = torch.sum(self.lambda_1 * pre)
+        if acc == 0:
+                # vanilla CURE regularizer
+                # second order regularization
+                outputs_pos = self.net.eval()(inputs + z)
+                loss_pos = self.criterion(outputs_pos, targets)
+                grad_diff = torch.autograd.grad((loss_pos-loss_orig), inputs, create_graph=True)[0]
+                pre = grad_diff.reshape(grad_diff.size(0), -1).norm(dim=1)
+        elif acc == 1 or acc == 2:
+                if acc == 1:
+                    # CURE regularization with higher order accuracy O(h^4) instead of O(h^2)
+                    # using central finite difference. These coefficients are fixed constants (see https://en.wikipedia.org/wiki/Finite_difference_coefficient)
+                    coeffs = torch.tensor([1/12, -2/3, 2/3, -1/12], requires_grad=False)
+                    # evaluation points
+                    evals = [self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z), self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z)]
+                else:
+                    # CURE regularization with higher order accuracy O(h^6) instead of O(h^2) 
+                    coeffs = torch.tensor([-1/60, 3/20, -3/4, 3/4, -3/20, 1/60], requires_grad=False)
+                    # evaluation points
+                    evals = [self.net.eval()(inputs - 3*h*z), self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z), 
+                             self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z), self.net.eval()(inputs + 3*h*z)]
+                losses = torch.stack([self.criterion(ev, targets) for ev in evals])
+                lin_comb = torch.sum(coeffs * losses)
+                approx = torch.autograd.grad(lin_comb, inputs, create_graph=True)[0]
+                pre = approx.reshape(approx.size(0), -1).norm(dim=1)
+        reg_1 = torch.sum(pre * self.lambda_1)
         self.net.zero_grad()
 
         # third order regularization
