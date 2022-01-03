@@ -8,12 +8,20 @@ from pathlib import Path
 import logging
 
 
-def objective(trial):
+def objective_CURE(trial):
     # Load the config
-    config = CIFAR_CONFIG
+    config = dict(CIFAR_CONFIG)
+    config["dataset"] = 'CIFAR10'
+    config["model_name"] = 'ResNet18'
+    config['batch_size_test'] = 500
+    config["accuracy"] = 2
+    config["epsilon"] = 8 / 255
+    config["epochs"] = 20
+    config["lambda_0"] = 0
+    config["lambda_2"] = 0
 
     # Let optuna select a the tunable parameters
-    config["lambda_"] = trial.suggest_uniform('lambda_', 0, 15)
+    config["lambda_1"] = trial.suggest_uniform('lambda_1', 0, 15)
     #config["optimization_algorithm"] = trial.suggest_categorical("optimization_algorithm", ['SGD', 'Adam'])
     config["optimizer_arguments"]["lr"] = trial.suggest_loguniform('lr', 1e-8, 1e-2)
 
@@ -28,7 +36,13 @@ def objective(trial):
 
 def objective_find_best_lambdas(trial):
     # Load the config
-    config = CIFAR_CONFIG
+    config = dict(CIFAR_CONFIG)
+    config["dataset"] = 'CIFAR10'
+    config["model_name"] = 'ResNet18'
+    config['batch_size_test'] = 500
+    config["accuracy"] = 2
+    config["epsilon"] = 8 / 255
+    config["epochs"] = 20
 
     # Let optuna select a the tunable parameters
     scaler = trial.suggest_uniform('scaler', 0, 100)
@@ -48,7 +62,7 @@ def objective_find_best_lambdas(trial):
     return value
 
 
-def tune_hyperparameters(n_trials=1000, save_frequency=10, save_path=".", existing_study_name=None):
+def tune_hyperparameters(n_trials=1000, save_frequency=10, save_path=".", existing_study_name=None, objective=objective_CURE):
     # Enable logging
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
 
@@ -77,7 +91,7 @@ def tune_hyperparameters(n_trials=1000, save_frequency=10, save_path=".", existi
         current_study = joblib.load(study_path)
 
         # Optimize the study for 'save_frequency' steps
-        current_study.optimize(objective_find_best_lambdas, n_trials=save_frequency, gc_after_trial=True)
+        current_study.optimize(objective, n_trials=save_frequency, gc_after_trial=True)
 
         # Store a checkpoint of the study
         joblib.dump(current_study, study_path)
