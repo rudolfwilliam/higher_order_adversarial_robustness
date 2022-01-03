@@ -372,23 +372,23 @@ class CURELearner():
         self.test_acc_adv = checkpoint['test_acc_adv']
         self.train_curv_total = checkpoint['train_curv_total']
         self.test_curv_total = checkpoint['test_curv_total']
-        self.train_curv_0 = checkpoint['train_curv_0'],
-        self.train_curv_1 = checkpoint['train_curv_1'],
-        self.train_curv_2 = checkpoint['train_curv_2'],
-        self.train_curv_3 = checkpoint['train_curv_3'],
-        self.test_curv_0 = checkpoint['test_curv_0'],
-        self.test_curv_1 = checkpoint['test_curv_1'],
-        self.test_curv_2 = checkpoint['test_curv_2'],
-        self.test_curv_3 = checkpoint['test_curv_3'],
+        self.train_curv_0 = checkpoint['train_curv_0']
+        self.train_curv_1 = checkpoint['train_curv_1']
+        self.train_curv_2 = checkpoint['train_curv_2']
+        self.train_curv_3 = checkpoint['train_curv_3']
+        self.test_curv_0 = checkpoint['test_curv_0']
+        self.test_curv_1 = checkpoint['test_curv_1']
+        self.test_curv_2 = checkpoint['test_curv_2']
+        self.test_curv_3 = checkpoint['test_curv_3']
         self.train_loss = checkpoint['train_loss']
         self.test_loss = checkpoint['test_loss']
 
-    def plot_results(self):
+    def plot_results(self, title=""):
         """
         Plotting the results
         """
         plt.figure(figsize=(18, 12))
-        plt.suptitle('Results', fontsize=18, y=0.96)
+        plt.suptitle(title + 'Results', fontsize=18, y=0.96)
         plt.subplot(4, 4, 1)
         plt.plot(self.train_acc, Linewidth=2, c='C0')
         plt.plot(self.test_acc_clean, Linewidth=2, c='C1')
@@ -399,12 +399,13 @@ class CURELearner():
         plt.xlabel('epoch', fontsize=14)
         plt.grid()
         plt.subplot(4, 4, 2)
-        plt.plot(self.train_curv_0, Linewidth=2, c='C0')
-        plt.plot(self.train_curv_1, Linewidth=2, c='C1')
-        plt.plot(self.train_curv_2, Linewidth=2, c='C2')
-        plt.plot(self.train_curv_3, Linewidth=2, c='C3')
         plt.plot(self.train_curv_total, Linewidth=4, c='black')
-        plt.legend(['train_curv_0', 'train_curv_1', 'train_curv_2', 'train_curv_3'], fontsize=14)
+        plt.plot(self.train_curv_0, Linewidth=2, c='C0', label='train_curv_0')
+        plt.plot(self.train_curv_1, Linewidth=2, c='C1', label='train_curv_1')
+        plt.plot(self.train_curv_2, Linewidth=2, c='C2', label='train_curv_2')
+        #plt.plot(self.train_curv_3, Linewidth=2, c='C3')
+        plt.legend(fontsize=14)
+
         plt.title('Train Curvatures', fontsize=14)
         plt.ylabel('curv', fontsize=14)
         plt.xlabel('epoch', fontsize=14)
@@ -412,12 +413,12 @@ class CURELearner():
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.subplot(4, 4, 3)
-        plt.plot(self.test_curv_0, Linewidth=2, c='C0')
-        plt.plot(self.test_curv_1, Linewidth=2, c='C1')
-        plt.plot(self.test_curv_2, Linewidth=2, c='C2')
-        plt.plot(self.test_curv_3, Linewidth=2, c='C3')
         plt.plot(self.test_curv_total, Linewidth=4, c='black')
-        plt.legend(['test_curv_0', 'test_curv_1', 'test_curv_2', 'test_curv_3'], fontsize=14)
+        plt.plot(self.test_curv_0, Linewidth=2, c='C0', label='test_curv_0')
+        plt.plot(self.test_curv_1, Linewidth=2, c='C1', label='test_curv_1')
+        plt.plot(self.test_curv_2, Linewidth=2, c='C2', label='test_curv_2')
+        #plt.plot(self.test_curv_3, Linewidth=2, c='C3')
+        plt.legend(fontsize=14)
         plt.title('Test Curvatures', fontsize=14)
         plt.ylabel('curv', fontsize=14)
         plt.xlabel('epoch', fontsize=14)

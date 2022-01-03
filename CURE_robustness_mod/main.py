@@ -4,7 +4,7 @@
 from getter import getter
 from pathlib import Path
 from CURE.CURE import CURELearner
-from utils.config import CIFAR_CONFIG #, CIFAR_CONFIG_RESNET20
+from utils.config import CIFAR_CONFIG  # , CIFAR_CONFIG_RESNET20
 
 
 def train_CURE(config, plot_results=True, trial=None):
@@ -46,7 +46,7 @@ def train_CURE(config, plot_results=True, trial=None):
     if plot_results:
         net_CURE.plot_results()
 
-    return net_CURE.test_acc_adv
+    return net_CURE
 
 
 if __name__ == "__main__":
