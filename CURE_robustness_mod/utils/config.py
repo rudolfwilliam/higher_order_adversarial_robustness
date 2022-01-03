@@ -1,7 +1,13 @@
+# Hessian vector product accuracies
+# LOW corresponds to original CURE
+LOW = 0
+MED = 1
+HIGH = 2
+
 
 CIFAR_CONFIG = {
     # Constants
-    "device": "cuda",
+    "device": "cpu",
 
     # Data parameters
     "batch_size_train": 100,  # E: Bugs want this to be 100 for cifar
@@ -15,9 +21,10 @@ CIFAR_CONFIG = {
     "model_name": 'ResNet18',  # SimpleModel or ResNet18
 
     # CURE configurations
-    "lambda_0": 4,
-    "lambda_1": 8,
-    "lambda_2": 8,
+    "accuracy": MED,
+    "lambda_0": 0,
+    "lambda_1": 4,
+    "lambda_2": 0,
     "mu_1": 0,
     "mu_2": 0,
     "mu_3": 0,
