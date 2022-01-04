@@ -184,15 +184,17 @@ def CURE_and_3rd_order_reg_and_h_scaler(epsilon, accuracy):
         accuracy (int): One of [1,2,4,6,8] denoting the accuracy level of the finite
             difference computation
     """
-    # Set a few base parameters
-    config = get_base_config(epsilon, accuracy)
-
-    config["lambda_0"] = 0
-    config["lambda_1"] = 4
-    config["lambda_2"] = 5
 
     # Iterate over different scaling constants h_scaler
     for h_scaler in [0.001, 0.01, 0.1, 1, 2, 4, 10]:
+
+        # Set a few base parameters
+        config = get_base_config(epsilon, accuracy)
+        config["lambda_0"] = 0
+        config["lambda_1"] = 4
+        config["lambda_2"] = 5
+
+        # Scale the h
         config["h"] = [h * h_scaler for h in config['h']]
 
         file_name = f"experiment_15d_eps{epsilon}_lambda2_5_hscaled_{h_scaler}_acc{accuracy}.data"

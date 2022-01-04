@@ -29,9 +29,9 @@ def objective_CURE(trial):
         config["h"][i] = trial.suggest_uniform(f'h_{i}', 0.01, 5)
 
     # Train CURE with the selected hyperparameters
-    adversarial_accuracy = train_CURE(config, plot_results=False, trial=trial)[-1]
+    net_CURE = train_CURE(config, plot_results=False, trial=trial)
 
-    return adversarial_accuracy
+    return net_CURE.test_acc_adv[-1]
 
 
 def objective_find_best_lambdas(trial):
