@@ -54,13 +54,18 @@ def pgd(inputs, net, epsilon=8, targets=None, step_size=0.04, num_steps=20, norm
     # Don't change the parameters of the NN
     net.eval()
 
+    # Get the number of channels the image has
+    num_channels = inputs.shape[1]
+
     # If the images are normalized, normalize also 'epsilon' and the boundaries of the image domain
     # ('clip_min' and 'clip_max')
     if normalizer is not None:
         epsilon = epsilon / (clip_max - clip_min)
         #clip_max = normalizer(torch.tensor(clip_max, dtype=torch.float32).view(1, 1, 1, 1)).to(device).view([])
-        clip_min = normalizer(torch.repeat_interleave(torch.tensor(clip_min, dtype=torch.float32), 3).view(1, 3, 1, 1)).to(device)
-        clip_max = normalizer(torch.repeat_interleave(torch.tensor(clip_max, dtype=torch.float32), 3).view(1, 3, 1, 1)).to(device)
+        clip_min = normalizer(torch.repeat_interleave(torch.tensor(
+            clip_min, dtype=torch.float32), num_channels).view(1, num_channels, 1, 1)).to(device)
+        clip_max = normalizer(torch.repeat_interleave(torch.tensor(
+            clip_max, dtype=torch.float32), num_channels).view(1, num_channels, 1, 1)).to(device)
         epsilon = epsilon * (clip_max - clip_min)
 
     # Compute the maximum perturbation
