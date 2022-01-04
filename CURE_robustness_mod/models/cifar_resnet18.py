@@ -29,6 +29,12 @@ class ModelGetter():
         self.model_name = model_name
 
     def get_model(self):
+        """
+        Constructs neural network and calls training if it has not been pretrained.
+
+        Returns:
+            ResNet18: The ResNet18 model finetuned to the dataset.
+        """
         model_path = Path("./models/pretrained/"+self.model_name+".pth")
 
         # If the model has not been finetuned to new dataset, finetune it

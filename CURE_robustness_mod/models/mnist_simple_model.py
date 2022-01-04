@@ -30,7 +30,7 @@ class ModelGetter():
         Constructs neural network and calls training if it has not been pretrained.
 
         Returns:
-            SimpleModel:
+            SimpleModel: The trained model.
         """
         model_path = Path("./models/pretrained/"+self.model_name+".pth")
 
