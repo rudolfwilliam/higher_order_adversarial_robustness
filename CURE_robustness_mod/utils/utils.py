@@ -11,21 +11,20 @@ import numpy as np
 
 
 def read_vision_dataset(path, batch_size=128, num_workers=4, dataset='CIFAR10', transform=None):
-    '''
-    Read dataset available in torchvision
+    '''Read dataset available in torchvision
 
-    Arguments:
-        dataset : string
+    Args:
+        dataset (string): 
             The name of dataset, it should be available in torchvision
-        transform_train : torchvision.transforms
-            train image transformation
+        transform_train (torchvision.transforms): 
+            Train image transformation
             if not given, the transformation for CIFAR10 is used
-        transform_test : torchvision.transforms
-            train image transformation
+        transform_test (torchvision.transforms): 
+            Train image transformation
             if not given, the transformation for CIFAR10 is used
-    Return:
-        trainloader, testloader
-    '''
+    Returns:
+        trainloader, testloader'''
+
     if not transform and dataset == 'CIFAR10':
         transform = transforms.Compose([
             transforms.ToTensor(),
@@ -52,14 +51,13 @@ def zero_gradients(tensor):
 
 
 def pgd(inputs, net, epsilon=8, targets=None, step_size=0.04, num_steps=20, normalizer=None, clip_min=0, clip_max=255, device="cpu"):
-    # We don't want to change the parameters of the NN
+    # Don't change the parameters of the NN
     net.eval()
 
     # If the images are normalized, normalize also 'epsilon' and the boundaries of the image domain
     # ('clip_min' and 'clip_max')
     if normalizer is not None:
         epsilon = epsilon / (clip_max - clip_min)
-        #clip_min = normalizer(torch.tensor(clip_min, dtype=torch.float32).view(1, 1, 1, 1)).to(device).view([])
         #clip_max = normalizer(torch.tensor(clip_max, dtype=torch.float32).view(1, 1, 1, 1)).to(device).view([])
         clip_min = normalizer(torch.repeat_interleave(torch.tensor(clip_min, dtype=torch.float32), 3).view(1, 3, 1, 1)).to(device)
         clip_max = normalizer(torch.repeat_interleave(torch.tensor(clip_max, dtype=torch.float32), 3).view(1, 3, 1, 1)).to(device)
@@ -106,15 +104,18 @@ def pgd(inputs, net, epsilon=8, targets=None, step_size=0.04, num_steps=20, norm
 
 
 def pgd_old(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=20, epsil=5./255.*8, transformer=None, inverse_transformer=None, device="cpu"):
-    """
-       :param image: Image of size HxWx3
-       :param net: network (input: images, output: values of activation **BEFORE** softmax).
-       :param num_classes: num_classes (limits the number of classes to test against, by default = 10)
-       :param overshoot: used as a termination criterion to prevent vanishing updates (default = 0.02).
-       :param max_iter: maximum number of iterations for deepfool (default = 50)
-       :return: minimal perturbation that fools the classifier, number of iterations that it required, new estimated_label and
-       perturbed image
-    """
+    """Perturb input in a PGD fashion
+
+       Args:
+            inputs (torch.Tensor): Image of size HxWx3
+            net (torch.Model): network (input: images, output: values of activation **BEFORE** softmax).
+            num_classes (int): num_classes (limits the number of classes to test against, by default = 10)
+            overshoot (float): used as a termination criterion to prevent vanishing updates (default = 0.02).
+            max_iter (int): maximum number of iterations for deepfool (default = 50)
+
+        Returns:
+            torch.Tensor: Minimal perturbation that fools the classifier, number of iterations that it required, new estimated_label and
+            perturbed image"""
     input_shape = inputs.shape
     pert_image = torch.tensor(inputs.detach().clone(),
                               requires_grad=True).to(device)
@@ -157,15 +158,19 @@ def pgd_old(inputs, net, epsilon=[1.], targets=None, step_size=0.04, num_steps=2
 
 
 def pgd_original(inputs, net, targets=None, step_size=0.04, num_steps=20, epsilon=5./255.*8, normalizer=None, clip_min=0, clip_max=255, device="cpu"):
-    """
-       :param image: Image of size HxWx3
-       :param net: network (input: images, output: values of activation **BEFORE** softmax).
-       :param num_classes: num_classes (limits the number of classes to test against, by default = 10)
-       :param overshoot: used as a termination criterion to prevent vanishing updates (default = 0.02).
-       :param max_iter: maximum number of iterations for deepfool (default = 50)
-       :return: minimal perturbation that fools the classifier, number of iterations that it required, new estimated_label and
-       perturbed image
-    """
+    """Perturb input in a PGD fashion
+
+       Args:
+            inputs (torch.Tensor): Image of size HxWx3
+            net (torch.Model): network (input: images, output: values of activation **BEFORE** softmax).
+            num_classes (int): num_classes (limits the number of classes to test against, by default = 10)
+            overshoot (float): used as a termination criterion to prevent vanishing updates (default = 0.02).
+            max_iter (int): maximum number of iterations for deepfool (default = 50)
+
+        Returns:
+            torch.Tensor: Minimal perturbation that fools the classifier, number of iterations that it required, new estimated_label and
+            perturbed image"""
+
     input_shape = inputs.shape
     pert_image = inputs.clone().to(device)
     w = torch.zeros(input_shape)
@@ -195,8 +200,6 @@ def pgd_original(inputs, net, targets=None, step_size=0.04, num_steps=20, epsilo
             pert_image[i] = torch.clamp(pert_image[i], 0., 1.)
             pert_image[i] = (pert_image[i] - torch.Tensor([0.4914, 0.4822, 0.4465]).view(3, 1, 1).to(device))
             pert_image[i] /= torch.Tensor([0.2023, 0.1994, 0.2010]).view(3, 1, 1).to(device)
-
-            #pert_image[i] = normal(torch.clamp(pert_image[i], 0., 1.))[None, :, :, :]
 
     r_tot = pert_image - inputs
     regul = np.linalg.norm(r_tot.cpu().flatten(start_dim=1, end_dim=-1), np.inf, axis=1)
