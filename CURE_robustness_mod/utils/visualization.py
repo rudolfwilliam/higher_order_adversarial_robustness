@@ -2,18 +2,40 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from getter import getter
+from CURE.CURE import CURELearner
 
 import numpy as np
 from matplotlib import pyplot as plt
+from pathlib import Path
 
 
-def lossplot(config: dict, path: str, save_path: str = None) -> None:
+
+def lossplot(config: dict, save_path: str = None) -> None:
     """Plots the negative of the loss surface. One axis represents the normal direction; the other is a random direction."""
     device = config["device"]
 
     get_dataloader, get_transformer, get_inverse_transformer, get_model = getter(
         config["dataset"], config["model_name"])
+    trainloader = get_dataloader(split="train", batch_size=config["batch_size_train"], shuffle=config["shuffle_train"])
+    testloader = get_dataloader(split="test", batch_size=config["batch_size_test"], shuffle=False)
+    
     model = get_model()
+
+    if config["use_checkpoint"]:
+        checkpoint_path = Path("./data/checkpoints/")
+        
+        transformer = get_transformer()
+        net_CURE = CURELearner(model, trainloader, testloader, lambda_0=config["lambda_0"], lambda_1=config["lambda_1"], lambda_2=config["lambda_2"], transformer=transformer, trial=None,
+                            image_min=config["image_min"], image_max=config["image_max"], device=config["device"], path=checkpoint_path / "best_model.data", acc=config["accuracy"])
+
+        net_CURE.set_optimizer(optim_alg=config["optimization_algorithm"],
+                            args=config["optimizer_arguments"])
+        
+        net_CURE.import_state(checkpoint_path / config["checkpoint_file"])
+
+        model = net_CURE.net
+
+
     model = model.to(device)
     #model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
     total_params = sum(p.numel() for p in model.parameters())
@@ -22,8 +44,7 @@ def lossplot(config: dict, path: str, save_path: str = None) -> None:
     print("Number of trainable parameters: {}".format(trainable_params))
     transformer = get_transformer()
     inverse_transformer = get_inverse_transformer()
-    trainloader = get_dataloader(split="train", batch_size=config["batch_size_train"], shuffle=config["shuffle_train"])
-    testloader = get_dataloader(split="test", batch_size=config["batch_size_test"], shuffle=False)
+
 
     L = nn.CrossEntropyLoss()
 
@@ -79,7 +100,7 @@ def lossplot(config: dict, path: str, save_path: str = None) -> None:
             ax.set_ylabel('Random Direction')
             if save_path is not None: plt.savefig(save_path + f"loss_{k}")
             plt.show()
-            plt.pause(.001)
+            plt.pause(.001) # Prevents blocking
 
             if k > 3:
                 exit()
