@@ -9,6 +9,16 @@ import logging
 
 
 def objective_CURE(trial):
+    """
+    Trains a CURE model with a specified regularization coefficient lambda_1 and then returns
+    the resulting adversarial accuracy
+
+    Args:
+        trial (optuna.Trial) An optuna Trial object
+
+    Returns:
+        A float value denoting the adversarial accuracy achieved by this run.
+    """
     # Load the config
     config = dict(CIFAR_CONFIG)
     config["dataset"] = 'CIFAR10'
@@ -22,7 +32,6 @@ def objective_CURE(trial):
 
     # Let optuna select a the tunable parameters
     config["lambda_1"] = trial.suggest_uniform('lambda_1', 0, 15)
-    #config["optimization_algorithm"] = trial.suggest_categorical("optimization_algorithm", ['SGD', 'Adam'])
     config["optimizer_arguments"]["lr"] = trial.suggest_loguniform('lr', 1e-8, 1e-2)
 
     for i in range(5):
@@ -35,6 +44,16 @@ def objective_CURE(trial):
 
 
 def objective_find_best_lambdas(trial):
+    """
+    Trains a CURE model with specified regularization coefficients lambda_0, lambda_1 and lambda_2
+    and then returns a linear combination of the resulting adversarial- and natural accuracy
+
+    Args:
+        trial (optuna.Trial) An optuna Trial object
+
+    Returns:
+        A float value denoting a linear combination of the resulting adversarial- and natural accuracy
+    """
     # Load the config
     config = dict(CIFAR_CONFIG)
     config["dataset"] = 'CIFAR10'
@@ -63,6 +82,18 @@ def objective_find_best_lambdas(trial):
 
 
 def tune_hyperparameters(n_trials=1000, save_frequency=10, save_path=".", existing_study_name=None, objective=objective_CURE):
+    """
+    Performs a hyperparameter optimization with a given objective function.
+
+    Args:
+        n_trials (int): The number of different parameter configurations which should be tried out
+        save_frequency (int): After how many trials the study object shall be cached to disk
+        save_path (str): A path to the place where the study object shall be cached
+        existing_study_name (str or None): If not None, resuem optimization from an existing study
+            object stored at this path
+        objective (func): An objective function accepting an optuna.Trial object and returning a score value
+    """
+
     # Enable logging
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
 
