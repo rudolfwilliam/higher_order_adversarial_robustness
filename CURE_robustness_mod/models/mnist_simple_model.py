@@ -24,7 +24,6 @@ class ModelGetter():
     def __init__(self, data_getter, model_name):
         self.data_getter = data_getter
         self.model_name = model_name
-        print(model_name)
 
     def get_simple_model(self):
         """
@@ -123,7 +122,7 @@ class SimpleModel(nn.Module):
         """
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = torch.flatten(x,start_dim=1)
+        x = torch.flatten(x, start_dim=1)
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
