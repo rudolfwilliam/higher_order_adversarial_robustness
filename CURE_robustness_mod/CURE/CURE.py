@@ -1,47 +1,31 @@
 import torch
-import copy
 import optuna
 import torch.nn as nn
-# from torch.autograd.gradcheck import zero_gradients
 from utils.utils import progress_bar
-import numpy as np
 import matplotlib.pyplot as plt
-from utils.utils import pgd, pgd_original
-import torchvision
-import os
+from utils.utils import pgd
 import torch
 import torch.nn as nn
-from torch.autograd import grad
 import torch.optim as optim
-import torch.nn.functional as F
-import torch.backends.cudnn as cudnn
-from torch.optim.lr_scheduler import StepLR
-from torch.distributions import uniform
 from torchvision.transforms import ToTensor, Compose
 
 
 class CURELearner():
+    '''Strongly modified version of the implementation of "Robustness via curvature regularization, and vice versa"
+       in https://arxiv.org/abs/1811.09716. This version includes higher and mixed order regularization and higher
+
+        Args:
+            net (Pytorch nn): network structure
+            trainloader (PyTorch Dataloader): The train loader 
+            testloader (PyTorch Dataloader): The test loader
+            device ('cpu' or 'cuda' if GPU available): type of decide to move tensors
+            lambda_ (float): power of regularization
+            path (string): path to save the best model
+            acc ([1, 2, 4, 6, 8]): level of accuracy for the computation of the Hessian vector product'''
+
     def __init__(self, net, trainloader, testloader,  lambda_0=4, lambda_1=4, lambda_2=0, transformer=None, trial=None, image_min=0, image_max=1, device='cuda',
                  path='./checkpoint', acc=0):
-        '''
-        CURE Class: Implementation of "Robustness via curvature regularization, and vice versa"
-                    in https://arxiv.org/abs/1811.09716
-        ================================================
-        Arguments:
 
-        net: PyTorch nn
-            network structure
-        trainloader: PyTorch Dataloader
-        testloader: PyTorch Dataloader
-        device: 'cpu' or 'cuda' if GPU available
-            type of decide to move tensors
-        lambda_: float
-            power of regularization
-        path: string
-            path to save the best model
-        acc: element of [0, 1, 2]
-            level of accuracy for the computation of the Hessian vector product
-        '''
         if not torch.cuda.is_available() and device == 'cuda':
             raise ValueError("cuda is not available")
 
@@ -71,20 +55,14 @@ class CURELearner():
 
 
     def set_optimizer(self, optim_alg='Adam', args={'lr': 1e-4}, scheduler=None, args_scheduler={}):
-        '''
-        Setting the optimizer of the network
-        ================================================
-        Arguments:
+        '''Set the optimizer of the network
+    
+        Args:
+            optim_alg (string): Name of the optimizer
+            args (dict): Parameter of the optimizer
+            scheduler (optim.lr_scheduler): Learning rate scheduler
+            args_scheduler (dict): Parameters of the scheduler'''
 
-        optim_alg : string
-            Name of the optimizer
-        args: dict
-            Parameter of the optimizer
-        scheduler: optim.lr_scheduler
-            Learning rate scheduler
-        args_scheduler : dict
-            Parameters of the scheduler
-        '''
         self.optimizer = getattr(optim, optim_alg)(
             self.net.parameters(), **args)
         if not scheduler:
@@ -95,17 +73,13 @@ class CURELearner():
                 self.optimizer, **args_scheduler)
 
     def train(self, h=[3], epochs=15, epsilon=8/255):
-        '''
-        Training the network
-        ================================================
-        Arguemnets:
+        '''Train the network
 
-        h : list with length less than the number of epochs
-            Different h for different epochs of training,
-            can have a single number or a list of floats for each epoch
-        epochs : int
-            Number of epochs
-        '''
+        Args:
+            h (list): List with length less than the number of epochs. Different h for different epochs of training,
+                    can have a single number or a list of floats for each epoch
+            epochs (int): Number of epochs'''
+
         if len(h) > epochs:
             raise ValueError(
                 'Length of h should be less than number of epochs')
@@ -131,9 +105,7 @@ class CURELearner():
             self.scheduler.step()
 
     def _train(self, epoch, h):
-        '''
-        Training the model
-        '''
+        '''Train the model'''
         print('\nEpoch: %d' % epoch)
         train_loss, total = 0, 0
         num_correct = 0
@@ -174,9 +146,7 @@ class CURELearner():
         self.train_curv_2.append(curvature_2 / (batch_idx + 1))
 
     def test(self, epoch, h, num_pgd_steps=20, eps=8/255):
-        '''
-        Testing the model
-        '''
+        '''Test the model'''
         test_loss, adv_acc, total, curvature, clean_acc, grad_sum = 0, 0, 0, 0, 0, 0
         curvature_0, curvature_1, curvature_2 = 0, 0, 0
 
@@ -189,13 +159,6 @@ class CURELearner():
             _, predicted = outputs.max(1)
             clean_acc += predicted.eq(targets).sum().item()
             total += targets.size(0)
-
-            # This was some really bad coding...
-            # inputs_pert = inputs + 0.
-            # eps = 5./255.*8
-            # inputs_pert = pgd(inputs, self.net.eval(), epsilon=[eps], targets=targets, step_size=0.04, num_steps=num_pgd_steps,
-            #                  epsil=eps, transformer=self.transformer, inverse_transformer=self.inverse_transformer, device=self.device)
-            # inputs_pert = inputs_pert + eps * torch.Tensor(r).to(self.device)
 
             inputs_pert = pgd(inputs, self.net, epsilon=eps, targets=targets, step_size=0.04, num_steps=num_pgd_steps,
                               normalizer=self.transformer, device=self.device, clip_min=self.image_min, clip_max=self.image_max)
@@ -229,20 +192,17 @@ class CURELearner():
         return test_loss/(batch_idx+1), 100.*adv_acc/total, 100.*clean_acc/total, curvature/(batch_idx+1)
 
     def _find_z(self, inputs, targets):
-        '''
-        Finding the direction in the regularizer
-        '''
+        '''Find the direction in the regularizer'''
         inputs.requires_grad_()
         outputs = self.net.eval()(inputs)
         loss_z = self.criterion(self.net.eval()(inputs), targets)
-        # loss_z.backward(torch.ones(targets.size()).to(self.device))
         loss_z.backward()
         grad = inputs.grad.data + 0.0
         norm_grad = grad.norm().item()
         z = torch.sign(grad).detach() + 0.
         z = 1. * (z+1e-7) / (z.reshape(z.size(0), -
                                            1).norm(dim=1)[:, None, None, None]+1e-7)
-        # zero_gradients(inputs)
+        # zero_gradients (on the inputs)
         inputs.grad.detach_()
         inputs.grad.zero_()
         self.net.zero_grad()
@@ -250,9 +210,12 @@ class CURELearner():
         return z, norm_grad
 
     def _3_diff(self, in_0, in_1, in_2):
+        '''Compute third order derivative without dividing by infinitesimal (absorbed by regularizer)'''
         return in_0-2*in_1+in_2
 
     def regularizer(self, inputs, targets, h=3.):
+        '''Taylor regularizer. Includes curvature regularization of accuracy determined by acc property. 
+           Also includes gradient and third order regularizers.'''
         acc = self.acc
         z, norm_grad = self._find_z(inputs, targets)
 
@@ -263,8 +226,6 @@ class CURELearner():
         reg_0 = torch.Tensor([0]).to(self.device)
         if self.lambda_0 != 0:
             # first order regularization
-            # first_order = torch.autograd.grad(loss_orig, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
-            #                                create_graph=True)[0].requires_grad_()
             first_order = torch.autograd.grad(loss_orig, inputs, create_graph=True)[0].requires_grad_()
             reg_0 = torch.sum(torch.pow(first_order, 2) * self.lambda_0)
             self.net.zero_grad()
@@ -277,7 +238,7 @@ class CURELearner():
             pre = approx.reshape(approx.size(0), -1).norm(dim=1)
             reg_1 = torch.sum(pre * self.lambda_1)
 
-        if acc in [2,4,6,8]:
+        if acc in [2, 4, 6, 8]:
                 if acc == 2:
                     # CURE regularization with higher order accuracy O(h^4) instead of O(h^2)
                     # using central finite difference. These coefficients are fixed constants (see https://en.wikipedia.org/wiki/Finite_difference_coefficient)
@@ -290,14 +251,14 @@ class CURELearner():
                     # evaluation points
                     evals = [self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z), self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z)]
                 elif acc==6:
-                    # CURE regularization with higher order accuracy O(h^6) instead of O(h^2)
+                    # CURE regularization with higher order accuracy O(h^8) instead of O(h^2)
                     coeffs = torch.tensor([-1/60, 3/20, -3/4, 3/4, -3/20, 1/60], requires_grad=False).to(self.device)
                     # evaluation points
                     evals = [self.net.eval()(inputs - 3*h*z), self.net.eval()(inputs - 2*h*z), self.net.eval()(inputs - h*z),
                              self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z), self.net.eval()(inputs + 3*h*z)]
                 elif acc==8:
-                    # CURE regularization with higher order accuracy O(h^8) instead of O(h^2)
-                    coeffs = torch.tensor([1/280,-4/105,1/5,-4/5,4/5,-1/5,4/105,-1/280], requires_grad=False).to(self.device)
+                    # CURE regularization with higher order accuracy O(h^10) instead of O(h^2)
+                    coeffs = torch.tensor([1/280, -4/105, 1/5, -4/5, 4/5, -1/5, 4/105, -1/280], requires_grad=False).to(self.device)
                     # evaluation points
                     evals = [self.net.eval()(inputs - 4*h*z), self.net.eval()(inputs - 3*h*z), self.net.eval()(inputs - 2*h*z),
                              self.net.eval()(inputs - h*z), self.net.eval()(inputs + h*z), self.net.eval()(inputs + 2*h*z),
@@ -319,24 +280,17 @@ class CURELearner():
 
             total_fin_dif = self._3_diff(loss_1, loss_2, loss_3)
 
-            # third_order_approx = torch.autograd.grad(total_fin_dif, inputs, grad_outputs=torch.ones(targets.size()).to(self.device),
-            #                                create_graph=True)[0]
             third_order_approx = torch.autograd.grad(total_fin_dif, inputs, create_graph=True)[0]
-            #third_order_approx = total_fin_dif
             reg_2 = torch.sum(torch.pow(third_order_approx, 2) * self.lambda_2)
             self.net.zero_grad()
 
         return (reg_0 + reg_1 + reg_2) / float(inputs.size(0)), norm_grad, [reg_0 / float(inputs.size(0)), reg_1 / float(inputs.size(0)), reg_2 / float(inputs.size(0))]
 
     def save_model(self, path):
-        '''
-        Saving the model
-        ================================================
-        Arguments:
+        '''Save the model
 
-        path: string
-            path to save the model
-        '''
+        Args:
+            path (string): path to save the model'''
 
         print('Saving...')
 
@@ -369,9 +323,7 @@ class CURELearner():
         torch.save(state, path)
 
     def import_model(self, path):
-        '''
-        Importing the pre-trained model
-        '''
+        '''Import the pre-trained model'''
         checkpoint = torch.load(path)
         self.net.load_state_dict(checkpoint['net'])
 
@@ -393,9 +345,7 @@ class CURELearner():
         self.test_loss = checkpoint['test_loss']
 
     def plot_results(self, title=""):
-        """
-        Plotting the results
-        """
+        """Plot the results"""
         plt.figure(figsize=(18, 12))
         plt.suptitle(title + 'Results', fontsize=18, y=0.96)
         plt.subplot(4, 4, 1)
