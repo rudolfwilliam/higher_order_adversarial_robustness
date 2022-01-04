@@ -9,7 +9,16 @@ from utils.config import CIFAR_CONFIG  # , CIFAR_CONFIG_RESNET20
 
 def train_CURE(config, plot_results=True, trial=None):
     """
-    The main function.
+    The training function.
+
+    Args:
+        config (dict): Configuration dictionary that provides training procedure with all necessary hyper parameters. 
+        plot_results (bool): If True, results will be plotted.
+        trial (optuna.trial.Trial): Necessary for hyper parameter optimization using Optuna (https://optuna.org/). 
+                                    A process for evaluating an objective function. 
+                                    See (https://optuna.readthedocs.io/en/stable/reference/trial.html?highlight=trial) for details.
+    Returns:
+        CURELearner: The trained model.
     """
 
     get_dataloader, get_transformer, _, get_model = getter(
