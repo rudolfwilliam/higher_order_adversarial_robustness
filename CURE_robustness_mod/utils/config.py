@@ -29,6 +29,3 @@ CIFAR_CONFIG = {
     "use_checkpoint": False,
     "checkpoint_file": 'checkpoint_01.data'
 }
-
-CIFAR_CONFIG_RESNET20 = dict(CIFAR_CONFIG)          # This now performs a deep copy
-CIFAR_CONFIG_RESNET20["model_name"] = 'ResNet20'
