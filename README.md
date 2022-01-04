@@ -6,7 +6,9 @@ In this repository, we explore the role of mixed and higher order effects in reg
 
 The base for our code is https://github.com/F-Salehi/CURE_robustness. However, we have changed quite a lot, so this repo has quite different dependencies. 
 
-To run our code, run `DL_project/CURE_robustness_mod/main.py`. You can set hyper parameters for e.g. regularizer constants, data set and level of estimation accuracy in `CURE_robustness_mod/utils/config.py`.
+To run an example execution of our code, run `CURE_robustness_mod/main.py`. You can set hyper parameters for e.g. regularizer constants, data set and level of estimation accuracy in `CURE_robustness_mod/utils/config.py`.
+
+To reproduce our experiments, run `CURE_robustness_mod/reproduce_experiments.py`. You are advised to use a sufficiently strong GPU with at least 8GB of memory.
 
 We recommend you to create a conda or virtual environment from our `CURE_robustness_mod/requirements.txt` with python version `3.7.1`. The code might still run if you do it differently, but no guarantees. :no_good:
 
