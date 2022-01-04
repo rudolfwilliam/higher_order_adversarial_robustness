@@ -1,16 +1,24 @@
-import torch
 from torch.utils.data import DataLoader
 import torchvision
-from torchvision.transforms import ToTensor, Normalize, ToPILImage
+from torchvision.transforms import ToTensor, Normalize
 
 
 class DataGetter():
-    """Helper class for getting various torchvision transformations and data loaders"""
+    """Helper class for getting various torchvision transformations and data loaders
+    
+       Args:
+            self.dataset (torch.utils.data.Dataset): data set from which to load the data
+            self.name ("MNIST" or "CIFAR10"): Name of data set used
+    """
     def __init__(self, dataset, name):
         self.dataset = dataset
         self.name = name
 
     def get_transformer(self):
+        """Get transformer depending on self.name
+
+        Returns:
+            torchvision.transforms.Transforms: Normalization based on data set depending on attribute self.name"""
         # The operations which are being applied to each image before training
         if self.name == 'MNIST':
             return torchvision.transforms.Compose([
@@ -20,11 +28,8 @@ class DataGetter():
         elif self.name == 'CIFAR10':
             return torchvision.transforms.Compose([
                 ToTensor(),
-                # Normalize((0.49139968, 0.48215841, 0.44653091), (0.24703223, 0.24348513, 0.26158784))
                 Normalize((0.4914, 0.4822, 0.4465),
                           (0.2023, 0.1994, 0.2010))
-                # Normalize((125.30691805, 122.95039414, 113.86538318), (62.99321928, 62.08870764, 66.70489964))
-                # Normalize(0.5, 0.5)
             ])
 
     def get_inverse_transformer(self):
@@ -35,7 +40,6 @@ class DataGetter():
                           (1 / 0.2023, 1 / 0.1994, 1 / 0.2010)),
                 Normalize((-0.4914, -0.4822, -0.4465),
                           (1, 1, 1)),
-                # ToPILImage(mode="RGB")
             ])
         if self.name == 'MNIST':
             return torchvision.transforms.Compose([
@@ -45,6 +49,19 @@ class DataGetter():
             ])
 
     def get_dataloader(self, split, batch_size=64, shuffle=True):
+        """Get a dataloader for specified parameters.
+
+           Args:
+                split ("train" ord "test"): split for data set to use
+                batch_size (int): batch size of data set
+                shuffle (bool: if True, will shuffle the data set, otherwise not
+            
+            Returns:
+                torch.utils.data.DataLoader: The dataloader
+            Raises:
+                Exception: If specified split is neither "train" nor "test"
+           """
+
         if split == "train":
             dataloader = DataLoader(
                 self.dataset('./data/'+self.name+'/', train=True, download=True,

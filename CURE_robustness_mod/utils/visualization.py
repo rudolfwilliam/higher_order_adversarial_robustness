@@ -8,14 +8,19 @@ from matplotlib import pyplot as plt
 
 
 def lossplot(config: dict, path: str, save_path: str = None) -> None:
-    """Plots the negative of the loss surface. One axis represents the normal direction; the other is a random direction."""
+    """Plot the negative of the loss surface. One axis represents the normal direction; the other is a random direction.
+
+       Args: 
+            config (dict): Configuration dictionary that provides training procedure with all necessary hyper parameters.
+            path (str): Unused argument
+            save_path (str): Path where to save the plot"""
+
     device = config["device"]
 
     get_dataloader, get_transformer, get_inverse_transformer, get_model = getter(
         config["dataset"], config["model_name"])
     model = get_model()
     model = model.to(device)
-    #model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
     total_params = sum(p.numel() for p in model.parameters())
     print("Total number of parameters: {}".format(total_params))
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -41,7 +46,6 @@ def lossplot(config: dict, path: str, save_path: str = None) -> None:
         inputs.requires_grad_()
         outputs = model.eval()(inputs)
 
-        # TODO: Don't calculate whole gradient here but in next loop per image
         loss = L(outputs, targets)
         gradient = torch.autograd.grad(loss, inputs, create_graph=True)[0]
         gradient = torch.flatten(gradient, start_dim=1)
