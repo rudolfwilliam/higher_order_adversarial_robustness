@@ -4,6 +4,15 @@ from data.dgetter import DataGetter
 
 
 def getter(dataset, modelname):
+    """Getter function for returning functions for getting dataloader, transformer, inverse_transformer and model
+
+    Args:
+        dataset ('MNIST or 'CIFAR10'): Dataset
+        modelname ('SimpleModel, ResNet18, ResNet20, AlexNet or VGG'): Model name
+    
+    Returns:
+        getter functions for dataloader, transformer, inverse_transformer and model"""
+        
     if dataset == 'CIFAR10':
         print(CIFAR10)
         dgetter = DataGetter(CIFAR10, 'CIFAR10')
@@ -18,18 +27,15 @@ def getter(dataset, modelname):
         elif modelname == 'ResNet18':
             from models.cifar_resnet18 import ModelGetter
             get_model = ModelGetter(dgetter, 'cifar10_resnet18').get_model
-            #model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
         elif modelname == 'ResNet20':
             from models.cifar_resnet20 import ModelGetter
             get_model = ModelGetter(dgetter, 'cifar10_resnet20').get_model
         elif modelname == 'AlexNet':
             from models.cifar_alexnet import ModelGetter
             get_model = ModelGetter(dgetter,'cifar10_alexnet').get_model
-            #model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
         elif modelname == 'VGG':
             from models.cifar_vgg import ModelGetter
             get_model = ModelGetter(dgetter,'cifar10_vgg').get_model
-            #model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
     elif dataset == 'MNIST':
         print(MNIST)
         dgetter = DataGetter(MNIST, 'MNIST')

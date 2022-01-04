@@ -5,6 +5,7 @@ from torchvision.transforms import ToTensor, Normalize, ToPILImage
 
 
 class DataGetter():
+    """Helper class for getting various torchvision transformations and data loaders"""
     def __init__(self, dataset, name):
         self.dataset = dataset
         self.name = name
@@ -27,10 +28,7 @@ class DataGetter():
             ])
 
     def get_inverse_transformer(self):
-        """
-        This function reverses the transformations of 'get_transformer'.
-        This is required for the PGD algorithm
-        """
+        """Reverses the transformations of 'get_transformer'. This is required for the PGD algorithm"""
         if self.name == 'CIFAR10':
             return torchvision.transforms.Compose([
                 Normalize((0, 0, 0),

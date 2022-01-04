@@ -12,9 +12,10 @@ from torchvision.transforms import ToTensor, Compose
 
 class CURELearner():
     '''Strongly modified version of the implementation of "Robustness via curvature regularization, and vice versa"
-       in https://arxiv.org/abs/1811.09716. This version includes higher and mixed order regularization and higher
+       in https://arxiv.org/abs/1811.09716. This version includes higher and mixed order regularization and higher 
+       accuracy approximations of the Hessian vector product in CURE.
 
-        Args:
+       Args:
             net (Pytorch nn): network structure
             trainloader (PyTorch Dataloader): The train loader 
             testloader (PyTorch Dataloader): The test loader
